@@ -27,22 +27,33 @@ async def start(message: types.Message):
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
     await message.reply('Файл получен, начинаю обработку...')
+    docs_dir = os.path.join(os.getcwd(), 'documents')
+    os.makedirs(docs_dir, exist_ok=True)
     # Remove leftover files from previous runs
     for fname in ('graph.png', 'report.pdf'):
         if os.path.exists(fname):
             os.remove(fname)
-    for fname in os.listdir('.'):  # clear old JSON exports
+    # Clear old JSON exports from the documents directory
+    for fname in os.listdir(docs_dir):
+        if fname.endswith('.json'):
+            try:
+                os.remove(os.path.join(docs_dir, fname))
+            except FileNotFoundError:
+                pass
+    # Also remove any JSON files in the working directory
+    for fname in os.listdir('.'):  # backward compatibility
         if fname.endswith('.json'):
             try:
                 os.remove(fname)
             except FileNotFoundError:
                 pass
 
-    file = await message.document.download(destination_dir='.')
-    data = load_chat(file.name)
+    file = await message.document.download(destination_dir=docs_dir)
+    file_path = os.path.join(docs_dir, file.name)
+    data = load_chat(file_path)
     messages = parse_messages(data)
     users = parse_users(data)
-    user_map = {u.id: (u.name or u.username or u.id) for u in users}
+    user_map = {u.id: (u.name or u.username or 'Unknown') for u in users}
     username_map = {u.username: (u.name or u.username) for u in users if u.username}
     del data  # free memory early
 
@@ -56,9 +67,15 @@ async def handle_document(message: types.Message):
         await message.reply_document(img, caption='Граф взаимодействий')
     with open('report.pdf', 'rb') as doc:
         await message.reply_document(doc, caption='Подробный отчёт')
-    os.remove(file.name)
+    os.remove(file_path)
     os.remove('graph.png')
     os.remove('report.pdf')
+    # Ensure documents directory is empty
+    for fname in os.listdir(docs_dir):
+        try:
+            os.remove(os.path.join(docs_dir, fname))
+        except FileNotFoundError:
+            pass
     del messages, users, metrics, strengths
     gc.collect()
 
