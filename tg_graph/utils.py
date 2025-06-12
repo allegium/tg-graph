@@ -2,8 +2,7 @@ import unicodedata
 
 
 def sanitize_text(text: str) -> str:
-    """Normalize fancy Unicode characters to improve font compatibility."""
+    """Normalize text and strip characters unsupported by common fonts."""
     normalized = unicodedata.normalize("NFKD", text)
-    return "".join(
-        ch for ch in normalized if unicodedata.category(ch)[0] != "S"
-    )
+    ascii_bytes = normalized.encode("ascii", "ignore")
+    return ascii_bytes.decode("ascii")
