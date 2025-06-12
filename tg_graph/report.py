@@ -10,6 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from typing import Dict, List, Tuple
+from .utils import sanitize_text
 
 
 def _format_metrics(metrics: Dict[str, float]) -> List[List[str]]:
@@ -67,7 +68,7 @@ def build_pdf(
         story.append(Paragraph("Сила связей", styles["Heading2"]))
         rows = [["От", "Кому", "Сила"]]
         for (src, dst), val in sorted(strengths.items(), key=lambda x: x[1], reverse=True):
-            rows.append([src, dst, f"{val:.2f}"])
+            rows.append([sanitize_text(src), sanitize_text(dst), f"{val:.2f}"])
         s_table = Table(rows, hAlign="LEFT", colWidths=[150, 150, 80])
         s_table.setStyle(
             TableStyle(
