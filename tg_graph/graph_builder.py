@@ -63,7 +63,7 @@ def build_graph(
                 fwd = str(fwd.get('id') or fwd.get('from_id') or fwd)
             else:
                 fwd = str(fwd)
-            target = user_map.get(fwd, username_map.get(fwd.lstrip('@'), fwd))
+            target = user_map.get(fwd) or username_map.get(fwd.lstrip('@')) or "Unknown"
             if target.lower() != "user":
                 G.add_edge(author, target, weight=INTERACTION_WEIGHTS['forward'])
         if m.reactions:
@@ -74,7 +74,7 @@ def build_graph(
                         actor = str(actor.get('id') or actor.get('from_id') or actor)
                     else:
                         actor = str(actor)
-                    actor_name = user_map.get(actor, username_map.get(actor.lstrip('@'), actor))
+                    actor_name = user_map.get(actor) or username_map.get(actor.lstrip('@')) or "Unknown"
                     if actor_name.lower() != "user":
                         G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and median_delta > 0:
