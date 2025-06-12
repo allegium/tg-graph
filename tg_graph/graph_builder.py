@@ -1,5 +1,4 @@
 import networkx as nx
-from collections import defaultdict
 from typing import Dict, List
 from .parser import Message
 
@@ -29,32 +28,54 @@ def compute_median_delta(messages: List[Message]) -> float:
     mid = len(deltas) // 2
     return float(deltas[mid])
 
-def build_graph(messages: List[Message], median_delta: float) -> nx.MultiDiGraph:
+def build_graph(
+    messages: List[Message],
+    median_delta: float,
+    user_map: Dict[str, str],
+    username_map: Dict[str, str],
+) -> nx.MultiDiGraph:
+    """Build a directed multigraph using display names instead of user IDs."""
     G = nx.MultiDiGraph()
     last_message = None
     for m in messages:
-        author = m.from_id
-        if not author:
+        author_id = m.from_id
+        if not author_id:
             last_message = m
             continue
+        author = user_map.get(author_id, author_id)
         G.add_node(author)
         if m.reply_to:
-            target = next((msg.from_id for msg in messages if msg.id == m.reply_to), None)
-            if target:
+            target_id = next((msg.from_id for msg in messages if msg.id == m.reply_to), None)
+            if target_id:
+                target = user_map.get(target_id, target_id)
                 G.add_edge(author, target, weight=INTERACTION_WEIGHTS['reply'])
         if isinstance(m.text, str) and '@' in m.text:
             # naive mention detection
             for word in m.text.split():
                 if word.startswith('@'):
-                    G.add_edge(author, word[1:], weight=INTERACTION_WEIGHTS['mention'])
+                    nick = word[1:].rstrip('.,!?:;')
+                    target = username_map.get(nick, nick)
+                    G.add_edge(author, target, weight=INTERACTION_WEIGHTS['mention'])
         if m.forwarded_from:
-            G.add_edge(author, m.forwarded_from, weight=INTERACTION_WEIGHTS['forward'])
+            fwd = m.forwarded_from
+            if isinstance(fwd, dict):
+                fwd = str(fwd.get('id') or fwd.get('from_id') or fwd)
+            else:
+                fwd = str(fwd)
+            target = user_map.get(fwd, username_map.get(fwd.lstrip('@'), fwd))
+            G.add_edge(author, target, weight=INTERACTION_WEIGHTS['forward'])
         if m.reactions:
             for reaction in m.reactions:
                 actor = reaction.get('actor')
                 if actor:
-                    G.add_edge(actor, author, weight=INTERACTION_WEIGHTS['reaction'])
+                    if isinstance(actor, dict):
+                        actor = str(actor.get('id') or actor.get('from_id') or actor)
+                    else:
+                        actor = str(actor)
+                    actor_name = user_map.get(actor, username_map.get(actor.lstrip('@'), actor))
+                    G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and last_message.from_id and median_delta > 0:
-            G.add_edge(author, last_message.from_id, weight=INTERACTION_WEIGHTS['temporal'])
+            prev_author = user_map.get(last_message.from_id, last_message.from_id)
+            G.add_edge(author, prev_author, weight=INTERACTION_WEIGHTS['temporal'])
         last_message = m
     return G

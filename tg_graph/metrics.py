@@ -85,3 +85,12 @@ def compute_metrics(G: nx.MultiDiGraph) -> Dict[str, float]:
     except Exception:
         metrics['diameter'] = 0
     return metrics
+
+
+def compute_interaction_strengths(G: nx.MultiDiGraph) -> Dict[tuple, float]:
+    """Aggregate edge weights between every pair of participants."""
+    strengths: Dict[tuple, float] = {}
+    for u, v, data in G.edges(data=True):
+        key = (u, v)
+        strengths[key] = strengths.get(key, 0.0) + float(data.get("weight", 1.0))
+    return strengths
