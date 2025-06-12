@@ -27,6 +27,17 @@ async def start(message: types.Message):
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
     await message.reply('Файл получен, начинаю обработку...')
+    # Remove leftover files from previous runs
+    for fname in ('graph.png', 'report.pdf'):
+        if os.path.exists(fname):
+            os.remove(fname)
+    for fname in os.listdir('.'):  # clear old JSON exports
+        if fname.endswith('.json'):
+            try:
+                os.remove(fname)
+            except FileNotFoundError:
+                pass
+
     file = await message.document.download(destination_dir='.')
     data = load_chat(file.name)
     messages = parse_messages(data)
