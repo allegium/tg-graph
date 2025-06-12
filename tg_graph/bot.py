@@ -1,5 +1,7 @@
 import os
 import gc
+import asyncio
+import tempfile
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 from .parser import load_chat, parse_messages, parse_users
@@ -27,29 +29,13 @@ async def start(message: types.Message):
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
     await message.reply('Файл получен, начинаю обработку...')
-    docs_dir = os.path.join(os.getcwd(), 'documents')
-    os.makedirs(docs_dir, exist_ok=True)
-    # Remove leftover files from previous runs
-    for fname in ('graph.png', 'report.pdf'):
-        if os.path.exists(fname):
-            os.remove(fname)
-    # Clear old JSON exports from the documents directory
-    for fname in os.listdir(docs_dir):
-        if fname.endswith('.json'):
-            try:
-                os.remove(os.path.join(docs_dir, fname))
-            except FileNotFoundError:
-                pass
-    # Also remove any JSON files in the working directory
-    for fname in os.listdir('.'):  # backward compatibility
-        if fname.endswith('.json'):
-            try:
-                os.remove(fname)
-            except FileNotFoundError:
-                pass
+    workdir = tempfile.mkdtemp(prefix='tgdocs_')
+    file = await message.document.download(destination_dir=workdir)
+    file_path = os.path.join(workdir, file.name)
+    asyncio.create_task(process_document(message, file_path, workdir))
 
-    file = await message.document.download(destination_dir=docs_dir)
-    file_path = os.path.join(docs_dir, file.name)
+
+async def process_document(message: types.Message, file_path: str, workdir: str) -> None:
     data = load_chat(file_path)
     messages = parse_messages(data)
     users = parse_users(data)
@@ -61,21 +47,24 @@ async def handle_document(message: types.Message):
     G = build_graph(messages, median, user_map, username_map)
     metrics = compute_metrics(G)
     strengths = compute_interaction_strengths(G)
-    visualize_graph(G, metrics, 'graph.png')
-    build_pdf('graph.png', metrics, strengths, 'report.pdf')
-    with open('graph.png', 'rb') as img:
+
+    graph_path = os.path.join(workdir, 'graph.png')
+    pdf_path = os.path.join(workdir, 'report.pdf')
+    visualize_graph(G, metrics, graph_path)
+    build_pdf(graph_path, metrics, strengths, pdf_path)
+    with open(graph_path, 'rb') as img:
         await message.reply_document(img, caption='Граф взаимодействий')
-    with open('report.pdf', 'rb') as doc:
+    with open(pdf_path, 'rb') as doc:
         await message.reply_document(doc, caption='Подробный отчёт')
-    os.remove(file_path)
-    os.remove('graph.png')
-    os.remove('report.pdf')
-    # Ensure documents directory is empty
-    for fname in os.listdir(docs_dir):
+    for fname in (file_path, graph_path, pdf_path):
         try:
-            os.remove(os.path.join(docs_dir, fname))
+            os.remove(fname)
         except FileNotFoundError:
             pass
+    try:
+        os.rmdir(workdir)
+    except OSError:
+        pass
     del messages, users, metrics, strengths
     gc.collect()
 
