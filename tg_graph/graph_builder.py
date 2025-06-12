@@ -34,6 +34,9 @@ def build_graph(messages: List[Message], median_delta: float) -> nx.MultiDiGraph
     last_message = None
     for m in messages:
         author = m.from_id
+        if not author:
+            last_message = m
+            continue
         G.add_node(author)
         if m.reply_to:
             target = next((msg.from_id for msg in messages if msg.id == m.reply_to), None)
@@ -51,7 +54,7 @@ def build_graph(messages: List[Message], median_delta: float) -> nx.MultiDiGraph
                 actor = reaction.get('actor')
                 if actor:
                     G.add_edge(actor, author, weight=INTERACTION_WEIGHTS['reaction'])
-        if last_message and median_delta > 0:
+        if last_message and last_message.from_id and median_delta > 0:
             G.add_edge(author, last_message.from_id, weight=INTERACTION_WEIGHTS['temporal'])
         last_message = m
     return G
