@@ -1,6 +1,19 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from typing import Dict
+from .utils import sanitize_text
+
+
+def _adjust_label_positions(pos: Dict[str, tuple], min_dist: float = 0.05) -> Dict[str, tuple]:
+    """Return new positions shifted slightly to reduce label overlap."""
+    new_pos: Dict[str, tuple] = {}
+    for node, (x, y) in pos.items():
+        nx_, ny_ = x, y
+        # Shift label until it does not collide with already placed labels
+        while any(((nx_ - ox) ** 2 + (ny_ - oy) ** 2) ** 0.5 < min_dist for ox, oy in new_pos.values()):
+            ny_ += min_dist
+        new_pos[node] = (nx_, ny_)
+    return new_pos
 
 plt.rcParams["font.family"] = "DejaVu Sans"
 
@@ -21,6 +34,10 @@ def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) ->
             x, y = pos[n]
             pos[n] = (x * 0.2, y * 0.2)
     weights = [float(data.get("weight", 1.0)) for *_, data in G.edges(data=True)]
+
+    # Sanitize labels so exotic symbols do not break the font
+    labels = {node: sanitize_text(str(node)) for node in G.nodes()}
+    label_pos = _adjust_label_positions(pos)
 
     node_colors = range(G.number_of_nodes())
     nx.draw_networkx_nodes(
@@ -44,7 +61,8 @@ def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) ->
 
     nx.draw_networkx_labels(
         G,
-        pos,
+        label_pos,
+        labels=labels,
         font_size=7,
         font_color="black",
         bbox=dict(facecolor="white", edgecolor="none", pad=0.2, alpha=0.8),
