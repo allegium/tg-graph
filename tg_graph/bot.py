@@ -34,8 +34,13 @@ async def handle_document(message: types.Message):
     metrics = compute_metrics(G)
     visualize_graph(G, metrics, 'graph.png')
     build_pdf('graph.png', metrics, 'report.pdf')
+    with open('graph.png', 'rb') as img:
+        await message.reply_document(img, caption='Граф взаимодействий')
     with open('report.pdf', 'rb') as doc:
-        await message.reply_document(doc, caption='Готово! Вот ваш отчёт.')
+        await message.reply_document(doc, caption='Подробный отчёт')
+    os.remove(file.name)
+    os.remove('graph.png')
+    os.remove('report.pdf')
 
 
 @dp.message_handler()
