@@ -1,5 +1,6 @@
 import os
-from aiogram import Bot, Dispatcher, executor, types
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
 from .parser import load_chat, parse_messages
 from .graph_builder import compute_median_delta, build_graph
 from .metrics import compute_metrics
@@ -7,6 +8,8 @@ from .visualization import visualize_graph
 from .report import build_pdf
 
 TOKEN = os.getenv('TG_BOT_TOKEN')
+if not TOKEN:
+    raise RuntimeError('TG_BOT_TOKEN environment variable not set')
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
@@ -22,6 +25,7 @@ async def start(message: types.Message):
 
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
+    await message.reply('Файл получен, начинаю обработку...')
     file = await message.document.download(destination_dir='.')
     data = load_chat(file.name)
     messages = parse_messages(data)
@@ -31,10 +35,16 @@ async def handle_document(message: types.Message):
     visualize_graph(G, metrics, 'graph.png')
     build_pdf('graph.png', metrics, 'report.pdf')
     with open('report.pdf', 'rb') as doc:
-        await message.reply_document(doc)
+        await message.reply_document(doc, caption='Готово! Вот ваш отчёт.')
+
+
+@dp.message_handler()
+async def unknown_message(message: types.Message):
+    await message.reply('Извините, я понимаю только команду /start и файлы экспорта чата.')
 
 
 def main():
+    print('Бот запущен и ждёт файлы...')
     executor.start_polling(dp)
 
 
