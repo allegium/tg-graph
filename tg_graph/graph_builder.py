@@ -39,15 +39,15 @@ def build_graph(
     msg_map = {m.id: m for m in messages}
     last_message = None
     for m in messages:
-        author = m.from_name or user_map.get(m.from_id, m.from_id)
-        if not author:
+        author = m.from_name
+        if not author or author.lower() == "user":
             last_message = m
             continue
         G.add_node(author)
         if m.reply_to:
             target_msg = msg_map.get(m.reply_to)
-            if target_msg:
-                target = target_msg.from_name or user_map.get(target_msg.from_id, target_msg.from_id)
+            if target_msg and target_msg.from_name and target_msg.from_name.lower() != "user":
+                target = target_msg.from_name
                 G.add_edge(author, target, weight=INTERACTION_WEIGHTS['reply'])
         if isinstance(m.text, str) and '@' in m.text:
             # naive mention detection
@@ -55,7 +55,8 @@ def build_graph(
                 if word.startswith('@'):
                     nick = word[1:].rstrip('.,!?:;')
                     target = username_map.get(nick, nick)
-                    G.add_edge(author, target, weight=INTERACTION_WEIGHTS['mention'])
+                    if target.lower() != "user":
+                        G.add_edge(author, target, weight=INTERACTION_WEIGHTS['mention'])
         if m.forwarded_from:
             fwd = m.forwarded_from
             if isinstance(fwd, dict):
@@ -63,7 +64,8 @@ def build_graph(
             else:
                 fwd = str(fwd)
             target = user_map.get(fwd, username_map.get(fwd.lstrip('@'), fwd))
-            G.add_edge(author, target, weight=INTERACTION_WEIGHTS['forward'])
+            if target.lower() != "user":
+                G.add_edge(author, target, weight=INTERACTION_WEIGHTS['forward'])
         if m.reactions:
             for reaction in m.reactions:
                 actor = reaction.get('actor')
@@ -73,13 +75,11 @@ def build_graph(
                     else:
                         actor = str(actor)
                     actor_name = user_map.get(actor, username_map.get(actor.lstrip('@'), actor))
-                    G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
+                    if actor_name.lower() != "user":
+                        G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and median_delta > 0:
-            prev_author = last_message.from_name or user_map.get(
-                last_message.from_id,
-                last_message.from_id,
-            )
-            if prev_author:
+            prev_author = last_message.from_name
+            if prev_author and prev_author.lower() != "user":
                 G.add_edge(
                     author,
                     prev_author,

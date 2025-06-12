@@ -13,36 +13,19 @@ from typing import Dict, List, Tuple
 
 
 def _format_metrics(metrics: Dict[str, float]) -> List[List[str]]:
-    """Convert metrics to a structured table with categories."""
+    """Convert metrics to a structured table with categories in Russian."""
 
-    rows: List[List[str]] = [["Category", "Metric", "Value"]]
+    rows: List[List[str]] = [["Категория", "Метрика", "Значение"]]
 
     overview = [
-        ("nodes", metrics.get("nodes", 0)),
-        ("edges", metrics.get("edges", 0)),
-        ("avg_degree", f"{metrics.get('avg_degree', 0):.2f}"),
-        ("clusters", metrics.get("clusters", 0)),
-        ("diameter", metrics.get("diameter", 0)),
+        ("число узлов", metrics.get("nodes", 0)),
+        ("число рёбер", metrics.get("edges", 0)),
+        ("средняя степень", f"{metrics.get('avg_degree', 0):.2f}"),
+        ("кластеры", metrics.get("clusters", 0)),
+        ("диаметр", metrics.get("diameter", 0)),
     ]
     for name, value in overview:
-        rows.append(["Overview", name, value])
-
-    centrality_metrics = [
-        "degree_centrality",
-        "betweenness_centrality",
-        "closeness_centrality",
-        "pagerank",
-    ]
-    for metric_name in centrality_metrics:
-        values = metrics.get(metric_name, {})
-        if isinstance(values, dict):
-            top = sorted(values.items(), key=lambda x: x[1], reverse=True)[:3]
-            for node, val in top:
-                rows.append([
-                    "Centrality",
-                    f"{metric_name} ({node})",
-                    f"{val:.4f}",
-                ])
+        rows.append(["Общее", name, value])
 
     return rows
 
@@ -55,7 +38,7 @@ def build_pdf(
 ) -> None:
     doc = SimpleDocTemplate(path, pagesize=A4)
     styles = getSampleStyleSheet()
-    story = [Paragraph("Telegram Chat Report", styles["Title"]), Spacer(1, 12)]
+    story = [Paragraph("Отчёт по чату Telegram", styles["Title"]), Spacer(1, 12)]
     # Slightly larger graph image for better readability in the PDF
     story.append(Image(graph_image, width=500, height=380, kind="proportional"))
     story.append(Spacer(1, 12))
@@ -81,8 +64,8 @@ def build_pdf(
     # Connection strengths table
     if strengths:
         story.append(Spacer(1, 12))
-        story.append(Paragraph("Connection Strengths", styles["Heading2"]))
-        rows = [["From", "To", "Strength"]]
+        story.append(Paragraph("Сила связей", styles["Heading2"]))
+        rows = [["От", "Кому", "Сила"]]
         for (src, dst), val in sorted(strengths.items(), key=lambda x: x[1], reverse=True):
             rows.append([src, dst, f"{val:.2f}"])
         s_table = Table(rows, hAlign="LEFT", colWidths=[150, 150, 80])
