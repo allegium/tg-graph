@@ -12,6 +12,14 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
 
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
+    await message.reply(
+        'Привет! Я могу проанализировать историю чата Telegram. '
+        'Пожалуйста, отправь мне файл экспорта чата (обычно это result.json).'
+    )
+
+
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
     file = await message.document.download(destination_dir='.')
