@@ -36,18 +36,18 @@ def build_graph(
 ) -> nx.MultiDiGraph:
     """Build a directed multigraph using display names instead of user IDs."""
     G = nx.MultiDiGraph()
+    msg_map = {m.id: m for m in messages}
     last_message = None
     for m in messages:
-        author_id = m.from_id
-        if not author_id:
+        author = m.from_name or user_map.get(m.from_id, m.from_id)
+        if not author:
             last_message = m
             continue
-        author = user_map.get(author_id, author_id)
         G.add_node(author)
         if m.reply_to:
-            target_id = next((msg.from_id for msg in messages if msg.id == m.reply_to), None)
-            if target_id:
-                target = user_map.get(target_id, target_id)
+            target_msg = msg_map.get(m.reply_to)
+            if target_msg:
+                target = target_msg.from_name or user_map.get(target_msg.from_id, target_msg.from_id)
                 G.add_edge(author, target, weight=INTERACTION_WEIGHTS['reply'])
         if isinstance(m.text, str) and '@' in m.text:
             # naive mention detection
@@ -74,8 +74,16 @@ def build_graph(
                         actor = str(actor)
                     actor_name = user_map.get(actor, username_map.get(actor.lstrip('@'), actor))
                     G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
-        if last_message and last_message.from_id and median_delta > 0:
-            prev_author = user_map.get(last_message.from_id, last_message.from_id)
-            G.add_edge(author, prev_author, weight=INTERACTION_WEIGHTS['temporal'])
+        if last_message and median_delta > 0:
+            prev_author = last_message.from_name or user_map.get(
+                last_message.from_id,
+                last_message.from_id,
+            )
+            if prev_author:
+                G.add_edge(
+                    author,
+                    prev_author,
+                    weight=INTERACTION_WEIGHTS['temporal'],
+                )
         last_message = m
     return G

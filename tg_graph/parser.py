@@ -7,6 +7,7 @@ class Message:
     id: int
     date: str
     from_id: Optional[str]
+    from_name: Optional[str]
     text: str
     reply_to: Optional[int] = None
     forwarded_from: Optional[str] = None
@@ -30,6 +31,7 @@ def parse_messages(data: Dict) -> List[Message]:
                 id=msg.get('id'),
                 date=msg.get('date'),
                 from_id=msg.get('from_id'),
+                from_name=msg.get('from'),
                 text=msg.get('text') if isinstance(msg.get('text'), str) else '',
                 reply_to=msg.get('reply_to_message_id'),
                 forwarded_from=msg.get('forwarded_from'),
