@@ -1,6 +1,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import math
+import json
 from typing import Dict, Tuple
 from .utils import sanitize_text
 
@@ -225,7 +226,7 @@ def visualize_graph_html(
     degrees = dict(agg.degree())
     node_radii = {n: _node_radius(deg) for n, deg in degrees.items()}
 
-    pos, clusters = _cluster_layout(agg, weight="weight")
+    _, clusters = _cluster_layout(agg, weight="weight")
     node_colors = {n: _cluster_color(clusters.get(n, 0)) for n in agg.nodes()}
 
     node_strengths: Dict[str, float] = {}
@@ -235,31 +236,34 @@ def visualize_graph_html(
         if v in valid_nodes:
             node_strengths[v] = node_strengths.get(v, 0.0) + w
 
-    coords = list(pos.values())
-    min_dist = None
-    for i, (x1, y1) in enumerate(coords):
-        for x2, y2 in coords[i + 1 :]:
-            d = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-            if min_dist is None or d < min_dist:
-                min_dist = d
-    if not min_dist:
-        min_dist = 0.01
+    width = 960
+    height = 720
 
-    scale = 60.0 / min_dist  # 15 mm ~ 60 px
-    scaled = {n: (x * scale, y * scale) for n, (x, y) in pos.items()}
+    nodes = [
+        {
+            "id": n,
+            "label": sanitize_text(str(n)),
+            "radius": node_radii.get(n, 6.0),
+            "color": node_colors.get(n, "#1f77b4"),
+            "strength": node_strengths.get(n, 0.0),
+        }
+        for n in agg.nodes()
+        if sanitize_text(str(n))
+    ]
 
-    xs = [x for x, _ in scaled.values()]
-    ys = [y for _, y in scaled.values()]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
+    links = [
+        {
+            "source": u,
+            "target": v,
+            "weight": float(data.get("weight", 1.0)),
+            "color": _edge_color(float(data.get("weight", 1.0))),
+            "width": _edge_width(float(data.get("weight", 1.0))),
+        }
+        for u, v, data in agg.edges(data=True)
+    ]
 
-    margin = 50
-    width = int(max_x - min_x + 2 * margin)
-    height = int(max_y - min_y + 2 * margin)
-
-    shifted = {
-        n: (x - min_x + margin, y - min_y + margin) for n, (x, y) in scaled.items()
-    }
+    nodes_json = json.dumps(nodes, ensure_ascii=False)
+    links_json = json.dumps(links, ensure_ascii=False)
 
     parts = [
         "<!DOCTYPE html>",
@@ -268,13 +272,12 @@ def visualize_graph_html(
         "<meta charset='utf-8'>",
         "<script src='https://d3js.org/d3.v7.min.js'></script>",
         "<style>",
-        "body {font-family: Arial, sans-serif;} ",
-        "line {stroke-width: 1.5; opacity: 0.7; transition: stroke-width 0.2s;} ",
-        "line:hover {stroke: red; stroke-width: 4;} ",
-        "circle {stroke: black; stroke-width: 1;} ",
-        "circle:hover {fill: orange;} ",
-        "text {font-size: 12px;} ",
-        "#legend div {margin-bottom: 4px;} ",
+        "body {font-family: Arial, sans-serif;}",
+        "line {opacity: 0.7; transition: stroke-width 0.2s;}",
+        "circle {stroke: black; stroke-width: 1;}",
+        "circle:hover {fill: orange;}",
+        "text {font-size: 12px;}",
+        "#legend div {margin-bottom: 4px;}",
         "</style>",
         "</head>",
         "<body>",
@@ -284,42 +287,7 @@ def visualize_graph_html(
         "<path d='M 0 0 L 10 5 L 0 10 z' fill='context-stroke' />",
         "</marker>",
         "</defs>",
-        "<g id='graph'>",
-    ]
-
-    for u, v, data in agg.edges(data=True):
-        if u not in shifted or v not in shifted:
-            # Skip edges for nodes that are not displayed
-            continue
-        w = float(data.get("weight", 1.0))
-        color = _edge_color(w)
-        x1, y1 = shifted[u]
-        x2, y2 = shifted[v]
-        su = sanitize_text(str(u))
-        sv = sanitize_text(str(v))
-        parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:black; stroke-width:{_edge_width(w) + 1:.2f}; opacity:1; pointer-events:none'></line>"
-        )
-        parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{_edge_width(w):.2f}; opacity:{_edge_opacity(w):.2f}'>"
-            f"<title>{su} \u2192 {sv} | \u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
-        )
-
-    for node, (x, y) in shifted.items():
-        label = sanitize_text(str(node))
-        if not label:
-            continue
-        strength = node_strengths.get(node, 0.0)
-        radius = node_radii.get(node, 6.0)
-        color = node_colors.get(node, "#1f77b4")
-        parts.append(
-            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{radius:.2f}' fill='{color}'>"
-            f"<title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
-        )
-        parts.append(f"<text x='{x + radius + 2:.2f}' y='{y - radius:.2f}'>{label}</text>")
-
-    parts.extend([
-        "</g>",
+        "<g id='graph'></g>",
         "</svg>",
         "<div id='legend' style='position:absolute;right:10px;top:10px;background:#fff;padding:6px;border:1px solid #ccc'>",
         "<strong>Легенда</strong>",
@@ -329,10 +297,41 @@ def visualize_graph_html(
         "<div style='margin-top:4px'>Размер круга \u2014 число связей</div>",
         "<div>Цвет круга \u2014 кластер</div>",
         "</div>",
-        "<script>const svg=d3.select('#svggraph');const g=d3.select('#graph');svg.call(d3.zoom().on('zoom',e=>g.attr('transform',e.transform)));</script>",
+        "<script>",
+        "const nodes = "+nodes_json+";",
+        "const links = "+links_json+";",
+        "const svg = d3.select('#svggraph');",
+        "const g = d3.select('#graph');",
+        "svg.call(d3.zoom().on('zoom', e => g.attr('transform', e.transform)));",
+        "const link = g.selectAll('line').data(links).enter().append('line')",
+        "    .attr('stroke', d => d.color)",
+        "    .attr('stroke-width', d => d.width)",
+        "    .attr('marker-end', 'url(#arrow)')",
+        "    .on('mouseover', function(event, d){ d3.select(this).attr('stroke','red').attr('stroke-width', d.width + 2); })",
+        "    .on('mouseout', function(event, d){ d3.select(this).attr('stroke', d.color).attr('stroke-width', d.width); });",
+        "const node = g.selectAll('circle').data(nodes).enter().append('circle')",
+        "    .attr('r', d => d.radius)",
+        "    .attr('fill', d => d.color)",
+        "    .call(d3.drag().on('start', dragStarted).on('drag', dragged).on('end', dragEnded));",
+        "node.append('title').text(d => d.label + ' | \u0421\u0438\u043b\u0430: ' + d.strength.toFixed(2));",
+        "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label);",
+        "const simulation = d3.forceSimulation(nodes)",
+        "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 120 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
+        "    .force('charge', d3.forceManyBody().strength(-80))",
+        "    .force('collide', d3.forceCollide().radius(d => d.radius + 5))",
+        "    .force('center', d3.forceCenter("+str(width/2)+", "+str(height/2)+"));",
+        "simulation.on('tick', () => {",
+        "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
+        "    node.attr('cx', d => d.x).attr('cy', d => d.y);",
+        "    label.attr('x', d => d.x + d.radius + 2).attr('y', d => d.y - d.radius);",
+        "});",
+        "function dragStarted(event, d){ if(!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }",
+        "function dragged(event, d){ d.fx = event.x; d.fy = event.y; }",
+        "function dragEnded(event, d){ if(!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }",
+        "</script>",
         "</body>",
         "</html>",
-    ])
+    ]
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
