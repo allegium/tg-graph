@@ -61,7 +61,7 @@ def build_graph(
                         target = user_map.get(str(target_msg.from_id)) or username_map.get(
                             str(target_msg.from_id)
                         )
-                if target and target.lower() != "user":
+                if target and target.lower() != "user" and target != author:
                     G.add_edge(author, target, weight=INTERACTION_WEIGHTS['reply'])
         if isinstance(m.text, str) and '@' in m.text:
             # naive mention detection
@@ -69,7 +69,7 @@ def build_graph(
                 if word.startswith('@'):
                     nick = word[1:].rstrip('.,!?:;')
                     target = username_map.get(nick, nick)
-                    if target.lower() != "user":
+                    if target.lower() != "user" and target != author:
                         G.add_edge(author, target, weight=INTERACTION_WEIGHTS['mention'])
         if m.forwarded_from:
             fwd = m.forwarded_from
@@ -78,7 +78,7 @@ def build_graph(
             else:
                 fwd = str(fwd)
             target = user_map.get(fwd) or username_map.get(fwd.lstrip('@')) or "Unknown"
-            if target.lower() != "user" and target != "Unknown":
+            if target.lower() != "user" and target != "Unknown" and target != author:
                 G.add_edge(author, target, weight=INTERACTION_WEIGHTS['forward'])
         if m.reactions:
             for reaction in m.reactions:
@@ -89,7 +89,7 @@ def build_graph(
                     else:
                         actor = str(actor)
                     actor_name = user_map.get(actor) or username_map.get(actor.lstrip('@')) or "Unknown"
-                    if actor_name.lower() != "user" and actor_name != "Unknown":
+                    if actor_name.lower() != "user" and actor_name != "Unknown" and actor_name != author:
                         G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and median_delta > 0:
             prev_author = last_message.from_name
@@ -98,7 +98,7 @@ def build_graph(
                     prev_author = user_map.get(str(last_message.from_id)) or username_map.get(
                         str(last_message.from_id)
                     )
-            if prev_author and prev_author.lower() != "user":
+            if prev_author and prev_author.lower() != "user" and prev_author != author:
                 G.add_edge(
                     author,
                     prev_author,

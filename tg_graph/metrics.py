@@ -93,6 +93,8 @@ def compute_interaction_strengths(G: nx.MultiDiGraph) -> Dict[tuple, float]:
     """Aggregate edge weights between every pair of participants."""
     strengths: Dict[tuple, float] = {}
     for u, v, data in G.edges(data=True):
+        if u == v:
+            continue
         key = (u, v)
         strengths[key] = strengths.get(key, 0.0) + float(data.get("weight", 1.0))
     return strengths

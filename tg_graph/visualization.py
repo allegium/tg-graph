@@ -137,6 +137,8 @@ def visualize_graph(
     valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
     agg.add_nodes_from(valid_nodes)
     for (u, v), w in strengths.items():
+        if u == v:
+            continue
         if u in valid_nodes and v in valid_nodes and w >= min_strength:
             agg.add_edge(u, v, weight=w)
 
@@ -228,6 +230,8 @@ def visualize_graph_html(
     valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
     agg.add_nodes_from(valid_nodes)
     for (u, v), w in strengths.items():
+        if u == v:
+            continue
         if u in valid_nodes and v in valid_nodes and w >= min_strength:
             agg.add_edge(u, v, weight=w)
     degrees = dict(agg.degree())
@@ -243,6 +247,9 @@ def visualize_graph_html(
         if v in valid_nodes:
             node_strengths[v] = node_strengths.get(v, 0.0) + w
 
+    # ``width`` and ``height`` are kept for backwards compatibility but
+    # the actual SVG dimensions will be set dynamically in the generated
+    # HTML so the graph takes up the full browser window.
     width = 960
     height = 720
 
@@ -291,7 +298,7 @@ def visualize_graph_html(
         "</style>",
         "</head>",
         "<body>",
-        f"<svg id='svggraph' width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
+        "<svg id='svggraph' style='width:100vw;height:100vh' xmlns='http://www.w3.org/2000/svg'>",
         "<defs>",
         "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='0.6' markerHeight='0.6' orient='auto-start-reverse'>",
         "<path d='M 0 0 L 10 5 L 0 10 z' fill='context-stroke' />",
@@ -312,12 +319,15 @@ def visualize_graph_html(
         "const links = "+links_json+";",
         "const svg = d3.select('#svggraph');",
         "const g = d3.select('#graph');",
+        "const width = window.innerWidth;",
+        "const height = window.innerHeight;",
+        "svg.attr('width', width).attr('height', height);",
         "const clusters = Array.from(new Set(nodes.map(n => n.cluster)));",
         "const clusterCenters = {};",
-        "const radius = Math.min("+str(width)+", "+str(height)+") / 1.8;",
+        "const radius = Math.min(width, height) / 1.8;",
         "clusters.forEach((c, i) => {",
         "    const angle = 2 * Math.PI * i / clusters.length;",
-        "    clusterCenters[c] = {x: "+str(width/2)+" + radius * Math.cos(angle), y: "+str(height/2)+" + radius * Math.sin(angle)};",
+        "    clusterCenters[c] = {x: width / 2 + radius * Math.cos(angle), y: height / 2 + radius * Math.sin(angle)};",
         "});",
         "svg.call(d3.zoom().on('zoom', e => g.attr('transform', e.transform)));",
         "const link = g.selectAll('line').data(links).enter().append('line')",
@@ -340,7 +350,7 @@ def visualize_graph_html(
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
         "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.6))",
         "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.6))",
-        "    .force('center', d3.forceCenter("+str(width/2)+", "+str(height/2)+"));",
+        "    .force('center', d3.forceCenter(width / 2, height / 2));",
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
         "    node.attr('cx', d => d.x).attr('cy', d => d.y);",
