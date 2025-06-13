@@ -12,6 +12,7 @@ class Message:
     reply_to: Optional[int] = None
     forwarded_from: Optional[str] = None
     reactions: Optional[List[Dict]] = None
+    text_entities: Optional[List[Dict]] = None
 
 @dataclass
 class User:
@@ -36,6 +37,7 @@ def parse_messages(data: Dict) -> List[Message]:
                 reply_to=msg.get('reply_to_message_id'),
                 forwarded_from=msg.get('forwarded_from'),
                 reactions=msg.get('reactions'),
+                text_entities=msg.get('text_entities'),
             )
         )
     return messages

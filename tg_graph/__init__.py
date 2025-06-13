@@ -8,4 +8,5 @@ __all__ = [
     'report',
     'bot',
     'utils',
+    'force_data',
 ]
