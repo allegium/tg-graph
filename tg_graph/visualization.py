@@ -22,8 +22,10 @@ def _adjust_label_positions(
     return new_pos
 
 
-def _cluster_layout(G: nx.Graph, weight: str = "weight") -> Dict[str, tuple]:
-    """Return node positions that emphasise densely connected groups."""
+def _cluster_layout(
+    G: nx.Graph, weight: str = "weight"
+) -> Tuple[Dict[str, tuple], Dict[str, int]]:
+    """Return node positions and a mapping of node to cluster index."""
     try:
         communities = list(nx.algorithms.community.louvain_communities(G))
     except Exception:
@@ -32,6 +34,7 @@ def _cluster_layout(G: nx.Graph, weight: str = "weight") -> Dict[str, tuple]:
         communities = [set(G.nodes())]
 
     pos: Dict[str, tuple] = {}
+    cluster_map: Dict[str, int] = {}
     angle_step = 2 * math.pi / len(communities)
     radius = 8.0
     for idx, community in enumerate(communities):
@@ -42,18 +45,19 @@ def _cluster_layout(G: nx.Graph, weight: str = "weight") -> Dict[str, tuple]:
         cy = radius * math.sin(angle)
         for node, (x, y) in sub_pos.items():
             pos[node] = (x + cx, y + cy)
-    return pos
+            cluster_map[node] = idx
+    return pos, cluster_map
 
 
 def _edge_color(weight: float) -> str:
-    """Return edge color based on interaction strength."""
-    if weight <= 1:
-        return "#fff7ae"  # light yellow
-    if weight <= 3:
-        return "#b2ffb2"  # light green
-    if weight <= 5:
-        return "#b2e1ff"  # light blue
-    return "#d7b2ff"  # light purple
+    """Return edge color from light to saturated depending on weight."""
+    t = min(weight / 6.0, 1.0)
+    light = (198, 219, 239)
+    dark = (8, 48, 107)
+    r = int(light[0] + t * (dark[0] - light[0]))
+    g = int(light[1] + t * (dark[1] - light[1]))
+    b = int(light[2] + t * (dark[2] - light[2]))
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 def _edge_width(weight: float) -> float:
@@ -71,6 +75,23 @@ def _node_radius(degree: int) -> float:
     return 6.0 + degree * 2.0
 
 
+def _cluster_color(index: int) -> str:
+    """Return a color for a given cluster index."""
+    palette = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+    ]
+    return palette[index % len(palette)]
+
+
 plt.rcParams["font.family"] = "DejaVu Sans"
 
 
@@ -79,11 +100,22 @@ def visualize_graph(
     metrics: Dict[str, float],
     strengths: Dict[Tuple[str, str], float],
     path: str,
+    min_strength: float = 2.0,
 ) -> None:
     """Save an interaction graph as a high resolution PNG image.
 
-    The width of each edge reflects the cumulative strength of interactions
-    between participants.
+    Parameters
+    ----------
+    G : nx.MultiDiGraph
+        Source graph with all interactions.
+    metrics : Dict[str, float]
+        Computed metrics for the chat (currently unused).
+    strengths : Dict[Tuple[str, str], float]
+        Aggregated edge strengths.
+    path : str
+        Output image path.
+    min_strength : float, optional
+        Edges weaker than this value are hidden.
     """
 
     # Larger figure with high DPI for readability
@@ -97,7 +129,7 @@ def visualize_graph(
             agg.add_edge(u, v, weight=w)
 
     # Spread nodes further apart so that labels do not overlap
-    pos = _cluster_layout(agg, weight="weight")
+    pos, clusters = _cluster_layout(agg, weight="weight")
     # Move the most connected nodes closer to the center
     degrees = dict(agg.degree())
     if degrees:
@@ -114,13 +146,12 @@ def visualize_graph(
     labels = {node: sanitize_text(str(node)) for node in agg.nodes()}
     label_pos = _adjust_label_positions(pos)
 
-    node_colors = range(agg.number_of_nodes())
+    node_colors = [_cluster_color(clusters.get(n, 0)) for n in agg.nodes()]
     nx.draw_networkx_nodes(
         agg,
         pos,
         node_size=node_sizes,
         node_color=node_colors,
-        cmap=plt.cm.tab20,
         edgecolors="black",
         linewidths=0.5,
     )
@@ -177,7 +208,7 @@ def visualize_graph_html(
     path : str
         Output HTML file.
     min_strength : float, optional
-        Filter threshold for displayed edges.
+        Edges weaker than this value are hidden.
     """
 
     agg = nx.DiGraph()
@@ -189,7 +220,8 @@ def visualize_graph_html(
     degrees = dict(agg.degree())
     node_radii = {n: _node_radius(deg) for n, deg in degrees.items()}
 
-    pos = _cluster_layout(agg, weight="weight")
+    pos, clusters = _cluster_layout(agg, weight="weight")
+    node_colors = {n: _cluster_color(clusters.get(n, 0)) for n in agg.nodes()}
 
     node_strengths: Dict[str, float] = {}
     for (u, v), w in strengths.items():
@@ -232,9 +264,9 @@ def visualize_graph_html(
         "<script src='https://d3js.org/d3.v7.min.js'></script>",
         "<style>",
         "body {font-family: Arial, sans-serif;} ",
-        "line {stroke-width: 1.5; opacity: 0.7;} ",
-        "line:hover {stroke: red; stroke-width: 3;} ",
-        "circle {fill: #1f77b4; stroke: black; stroke-width: 1;} ",
+        "line {stroke-width: 1.5; opacity: 0.7; transition: stroke-width 0.2s;} ",
+        "line:hover {stroke: red; stroke-width: 4;} ",
+        "circle {stroke: black; stroke-width: 1;} ",
         "circle:hover {fill: orange;} ",
         "text {font-size: 12px;} ",
         "#legend div {margin-bottom: 4px;} ",
@@ -274,8 +306,10 @@ def visualize_graph_html(
             continue
         strength = node_strengths.get(node, 0.0)
         radius = node_radii.get(node, 6.0)
+        color = node_colors.get(node, "#1f77b4")
         parts.append(
-            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{radius:.2f}'><title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{radius:.2f}' fill='{color}'>"
+            f"<title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
         )
         parts.append(f"<text x='{x + radius + 2:.2f}' y='{y - radius:.2f}'>{label}</text>")
 
@@ -284,10 +318,11 @@ def visualize_graph_html(
         "</svg>",
         "<div id='legend' style='position:absolute;right:10px;top:10px;background:#fff;padding:6px;border:1px solid #ccc'>",
         "<strong>Легенда</strong>",
-        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#fff7ae' stroke-width='3'/></svg> Сила 1</div>",
-        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#b2ffb2' stroke-width='4.5'/></svg> Сила 2-3</div>",
-        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#b2e1ff' stroke-width='6'/></svg> Сила 4-5</div>",
-        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#d7b2ff' stroke-width='7.5'/></svg> 6+</div>",
+        f"<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='{_edge_color(1)}' stroke-width='{_edge_width(1):.1f}'/></svg> Слабая связь</div>",
+        f"<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='{_edge_color(3)}' stroke-width='{_edge_width(3):.1f}'/></svg> Средняя связь</div>",
+        f"<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='{_edge_color(6)}' stroke-width='{_edge_width(6):.1f}'/></svg> Сильная связь</div>",
+        "<div style='margin-top:4px'>Размер круга \u2014 число связей</div>",
+        "<div>Цвет круга \u2014 кластер</div>",
         "</div>",
         "<script>const svg=d3.select('#svggraph');const g=d3.select('#graph');svg.call(d3.zoom().on('zoom',e=>g.attr('transform',e.transform)));</script>",
         "</body>",
