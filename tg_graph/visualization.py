@@ -110,7 +110,7 @@ def visualize_graph(
     metrics: Dict[str, float],
     strengths: Dict[Tuple[str, str], float],
     path: str,
-    min_strength: float = 2.0,
+    min_strength: float = 0.0,
 ) -> None:
     """Save an interaction graph as a high resolution PNG image.
 
@@ -125,7 +125,7 @@ def visualize_graph(
     path : str
         Output image path.
     min_strength : float, optional
-        Edges weaker than this value are hidden.
+        Edges weaker than this value are hidden. By default all edges are shown.
     """
 
     # Larger figure with high DPI for readability
@@ -219,7 +219,7 @@ def visualize_graph_html(
     path : str
         Output HTML file.
     min_strength : float, optional
-        Edges weaker than this value are hidden.
+        Edges weaker than this value are hidden. By default all edges are shown.
     """
 
     agg = nx.DiGraph()
