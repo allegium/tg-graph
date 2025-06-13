@@ -353,7 +353,7 @@ def visualize_graph_html(
         "        .strength(d => {",
         "            const base = Math.min(d.weight / 6, 1);",
         "            // Increase attraction within a cluster and reduce it across clusters",
-        "            const cf = d.source.cluster === d.target.cluster ? 1 : 1 / 1;",
+        "            const cf = d.source.cluster === d.target.cluster ? 300 : 1 / 300;",
         "            return base * cf * 0.0001;",
         "        }))",
         "    .force('charge', d3.forceManyBody().strength(-14000))",
