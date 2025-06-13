@@ -52,7 +52,8 @@ def visualize_graph(
     weights = [float(data.get("weight", 1.0)) for *_, data in agg.edges(data=True)]
 
     # Sanitize labels so exotic symbols do not break the font
-    labels = {node: sanitize_text(str(node)) for node in G.nodes()}
+    # Only include labels for nodes that will actually be drawn
+    labels = {node: sanitize_text(str(node)) for node in agg.nodes()}
     label_pos = _adjust_label_positions(pos)
 
     node_colors = range(agg.number_of_nodes())
