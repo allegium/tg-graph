@@ -51,9 +51,10 @@ Follow these steps even if you have never written code before.
    bot. After the upload finishes, the bot will analyze the chat and reply first
    with a PNG image containing the interaction graph, an HTML file with an
    interactive version of the graph, and a PDF report with a structured table of
-   metrics. The HTML graph highlights nodes and edges on hover, shows the
-   participants of every connection and uses thicker lines for stronger
-   interactions.
+  metrics. The HTML graph highlights nodes and edges on hover, displays the
+  participants and strength of every connection and uses thicker lines with a
+  thin black outline for stronger interactions. Move the mouse over a node to
+  see its total interaction strength.
    Nodes without connections or with unknown names are omitted to keep the graph clear.
 
 That’s all! Every time you restart the bot you will need to set the

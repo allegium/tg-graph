@@ -1,19 +1,49 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import math
 from typing import Dict, Tuple
 from .utils import sanitize_text
 
 
-def _adjust_label_positions(pos: Dict[str, tuple], min_dist: float = 0.05) -> Dict[str, tuple]:
+def _adjust_label_positions(
+    pos: Dict[str, tuple], min_dist: float = 0.05
+) -> Dict[str, tuple]:
     """Return new positions shifted slightly to reduce label overlap."""
     new_pos: Dict[str, tuple] = {}
     for node, (x, y) in pos.items():
         nx_, ny_ = x, y
         # Shift label until it does not collide with already placed labels
-        while any(((nx_ - ox) ** 2 + (ny_ - oy) ** 2) ** 0.5 < min_dist for ox, oy in new_pos.values()):
+        while any(
+            ((nx_ - ox) ** 2 + (ny_ - oy) ** 2) ** 0.5 < min_dist
+            for ox, oy in new_pos.values()
+        ):
             ny_ += min_dist
         new_pos[node] = (nx_, ny_)
     return new_pos
+
+
+def _cluster_layout(G: nx.Graph, weight: str = "weight") -> Dict[str, tuple]:
+    """Return node positions that emphasise densely connected groups."""
+    try:
+        communities = list(nx.algorithms.community.louvain_communities(G))
+    except Exception:
+        communities = [set(G.nodes())]
+    if not communities:
+        communities = [set(G.nodes())]
+
+    pos: Dict[str, tuple] = {}
+    angle_step = 2 * math.pi / len(communities)
+    radius = 8.0
+    for idx, community in enumerate(communities):
+        sub = G.subgraph(community)
+        sub_pos = nx.spring_layout(sub, k=4.0, seed=42, weight=weight)
+        angle = angle_step * idx
+        cx = radius * math.cos(angle)
+        cy = radius * math.sin(angle)
+        for node, (x, y) in sub_pos.items():
+            pos[node] = (x + cx, y + cy)
+    return pos
+
 
 plt.rcParams["font.family"] = "DejaVu Sans"
 
@@ -41,7 +71,7 @@ def visualize_graph(
             agg.add_edge(u, v, weight=w)
 
     # Spread nodes further apart so that labels do not overlap
-    pos = nx.spring_layout(agg, k=4.0, seed=42, weight="weight")
+    pos = _cluster_layout(agg, weight="weight")
     # Move the most connected nodes closer to the center
     degrees = dict(agg.degree())
     if degrees:
@@ -81,6 +111,14 @@ def visualize_graph(
     nx.draw_networkx_edges(
         agg,
         pos,
+        width=[w * 2.0 + 2 for w in weights],
+        alpha=1.0,
+        edge_color="black",
+        arrows=False,
+    )
+    nx.draw_networkx_edges(
+        agg,
+        pos,
         width=[w * 2.0 for w in weights],
         alpha=0.7,
         edge_color=edge_colors,
@@ -115,7 +153,14 @@ def visualize_graph_html(
         if u in valid_nodes and v in valid_nodes:
             agg.add_edge(u, v, weight=w)
 
-    pos = nx.spring_layout(agg, k=4.0, seed=42, weight="weight")
+    pos = _cluster_layout(agg, weight="weight")
+
+    node_strengths: Dict[str, float] = {}
+    for (u, v), w in strengths.items():
+        if u in valid_nodes:
+            node_strengths[u] = node_strengths.get(u, 0.0) + w
+        if v in valid_nodes:
+            node_strengths[v] = node_strengths.get(v, 0.0) + w
 
     coords = list(pos.values())
     min_dist = None
@@ -139,7 +184,9 @@ def visualize_graph_html(
     width = int(max_x - min_x + 2 * margin)
     height = int(max_y - min_y + 2 * margin)
 
-    shifted = {n: (x - min_x + margin, y - min_y + margin) for n, (x, y) in scaled.items()}
+    shifted = {
+        n: (x - min_x + margin, y - min_y + margin) for n, (x, y) in scaled.items()
+    }
 
     parts = [
         "<!DOCTYPE html>",
@@ -183,6 +230,9 @@ def visualize_graph_html(
         sv = sanitize_text(str(v))
         color = _color(w)
         parts.append(
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:black; stroke-width:{w * 2.0 + 2:.2f}; opacity:1; pointer-events:none'></line>"
+        )
+        parts.append(
             f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{w * 2.0:.2f}'>"
             f"<title>{su} \u2192 {sv} | \u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
         )
@@ -191,7 +241,10 @@ def visualize_graph_html(
         label = sanitize_text(str(node))
         if not label:
             continue
-        parts.append(f"<circle cx='{x:.2f}' cy='{y:.2f}' r='8'><title>{label}</title></circle>")
+        strength = node_strengths.get(node, 0.0)
+        parts.append(
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='8'><title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
+        )
         parts.append(f"<text x='{x + 10:.2f}' y='{y - 10:.2f}'>{label}</text>")
 
     parts.extend(["</svg>", "</body>", "</html>"])
