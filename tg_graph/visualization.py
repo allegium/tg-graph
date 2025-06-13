@@ -45,6 +45,32 @@ def _cluster_layout(G: nx.Graph, weight: str = "weight") -> Dict[str, tuple]:
     return pos
 
 
+def _edge_color(weight: float) -> str:
+    """Return edge color based on interaction strength."""
+    if weight <= 1:
+        return "#fff7ae"  # light yellow
+    if weight <= 3:
+        return "#b2ffb2"  # light green
+    if weight <= 5:
+        return "#b2e1ff"  # light blue
+    return "#d7b2ff"  # light purple
+
+
+def _edge_width(weight: float) -> float:
+    """Return line width for a given interaction strength."""
+    return 1.0 + weight * 1.5
+
+
+def _edge_opacity(weight: float) -> float:
+    """Return line opacity for a given interaction strength."""
+    return 0.3 + 0.05 * weight
+
+
+def _node_radius(degree: int) -> float:
+    """Return node radius based on the total number of connections."""
+    return 6.0 + degree * 2.0
+
+
 plt.rcParams["font.family"] = "DejaVu Sans"
 
 
@@ -67,7 +93,7 @@ def visualize_graph(
     valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
     agg.add_nodes_from(valid_nodes)
     for (u, v), w in strengths.items():
-        if u in valid_nodes and v in valid_nodes:
+        if u in valid_nodes and v in valid_nodes and w >= min_strength:
             agg.add_edge(u, v, weight=w)
 
     # Spread nodes further apart so that labels do not overlap
@@ -81,6 +107,8 @@ def visualize_graph(
             pos[n] = (x * 0.2, y * 0.2)
     weights = [float(data.get("weight", 1.0)) for *_, data in agg.edges(data=True)]
 
+    node_sizes = [_node_radius(degrees.get(n, 0)) ** 2 for n in agg.nodes()]
+
     # Sanitize labels so exotic symbols do not break the font
     # Only include labels for nodes that will actually be drawn
     labels = {node: sanitize_text(str(node)) for node in agg.nodes()}
@@ -90,28 +118,19 @@ def visualize_graph(
     nx.draw_networkx_nodes(
         agg,
         pos,
-        node_size=150,
+        node_size=node_sizes,
         node_color=node_colors,
         cmap=plt.cm.tab20,
         edgecolors="black",
         linewidths=0.5,
     )
 
-    def _color(weight: float) -> str:
-        if weight <= 1:
-            return "#fff7ae"  # pastel yellow
-        if weight <= 3:
-            return "#b2ffb2"  # pastel green
-        if weight <= 5:
-            return "#b2e1ff"  # pastel blue
-        return "#d7b2ff"  # pastel purple
-
-    edge_colors = [_color(w) for w in weights]
+    edge_colors = [_edge_color(w) for w in weights]
 
     nx.draw_networkx_edges(
         agg,
         pos,
-        width=[w * 2.0 + 2 for w in weights],
+        width=[_edge_width(w) + 1 for w in weights],
         alpha=1.0,
         edge_color="black",
         arrows=False,
@@ -119,8 +138,8 @@ def visualize_graph(
     nx.draw_networkx_edges(
         agg,
         pos,
-        width=[w * 2.0 for w in weights],
-        alpha=0.7,
+        width=[_edge_width(w) for w in weights],
+        alpha=[_edge_opacity(w) for w in weights],
         edge_color=edge_colors,
         arrows=True,
         arrowsize=4,
@@ -142,16 +161,33 @@ def visualize_graph(
 
 
 def visualize_graph_html(
-    G: nx.MultiDiGraph, strengths: Dict[Tuple[str, str], float], path: str
+    G: nx.MultiDiGraph,
+    strengths: Dict[Tuple[str, str], float],
+    path: str,
+    min_strength: float = 0.0,
 ) -> None:
-    """Save an interactive graph visualisation as a standalone HTML file."""
+    """Save an interactive graph visualisation as a standalone HTML file.
+
+    Parameters
+    ----------
+    G : nx.MultiDiGraph
+        Source graph with all interactions.
+    strengths : Dict[Tuple[str, str], float]
+        Aggregated interaction strengths for each edge.
+    path : str
+        Output HTML file.
+    min_strength : float, optional
+        Filter threshold for displayed edges.
+    """
 
     agg = nx.DiGraph()
     valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
     agg.add_nodes_from(valid_nodes)
     for (u, v), w in strengths.items():
-        if u in valid_nodes and v in valid_nodes:
+        if u in valid_nodes and v in valid_nodes and w >= min_strength:
             agg.add_edge(u, v, weight=w)
+    degrees = dict(agg.degree())
+    node_radii = {n: _node_radius(deg) for n, deg in degrees.items()}
 
     pos = _cluster_layout(agg, weight="weight")
 
@@ -193,47 +229,42 @@ def visualize_graph_html(
         "<html>",
         "<head>",
         "<meta charset='utf-8'>",
+        "<script src='https://d3js.org/d3.v7.min.js'></script>",
         "<style>",
-        "line {stroke-width: 1.5; opacity: 0.7;}",
-        "line:hover {stroke: red; stroke-width: 3;}",
-        "circle {fill: #1f77b4; stroke: black; stroke-width: 1;}",
-        "circle:hover {fill: orange;}",
-        "text {font-size: 12px; font-family: Arial, sans-serif;}",
+        "body {font-family: Arial, sans-serif;} ",
+        "line {stroke-width: 1.5; opacity: 0.7;} ",
+        "line:hover {stroke: red; stroke-width: 3;} ",
+        "circle {fill: #1f77b4; stroke: black; stroke-width: 1;} ",
+        "circle:hover {fill: orange;} ",
+        "text {font-size: 12px;} ",
+        "#legend div {margin-bottom: 4px;} ",
         "</style>",
         "</head>",
         "<body>",
-        f"<svg width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
+        f"<svg id='svggraph' width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
         "<defs>",
         "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='3' markerHeight='3' orient='auto-start-reverse'>",
         "<path d='M 0 0 L 10 5 L 0 10 z' fill='context-stroke' />",
         "</marker>",
         "</defs>",
+        "<g id='graph'>",
     ]
-
-    def _color(weight: float) -> str:
-        if weight <= 1:
-            return "#fff7ae"  # pastel yellow
-        if weight <= 3:
-            return "#b2ffb2"  # pastel green
-        if weight <= 5:
-            return "#b2e1ff"  # pastel blue
-        return "#d7b2ff"  # pastel purple
 
     for u, v, data in agg.edges(data=True):
         if u not in shifted or v not in shifted:
             # Skip edges for nodes that are not displayed
             continue
         w = float(data.get("weight", 1.0))
+        color = _edge_color(w)
         x1, y1 = shifted[u]
         x2, y2 = shifted[v]
         su = sanitize_text(str(u))
         sv = sanitize_text(str(v))
-        color = _color(w)
         parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:black; stroke-width:{w * 2.0 + 2:.2f}; opacity:1; pointer-events:none'></line>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:black; stroke-width:{_edge_width(w) + 1:.2f}; opacity:1; pointer-events:none'></line>"
         )
         parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{w * 2.0:.2f}'>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{_edge_width(w):.2f}; opacity:{_edge_opacity(w):.2f}'>"
             f"<title>{su} \u2192 {sv} | \u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
         )
 
@@ -242,12 +273,26 @@ def visualize_graph_html(
         if not label:
             continue
         strength = node_strengths.get(node, 0.0)
+        radius = node_radii.get(node, 6.0)
         parts.append(
-            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='8'><title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{radius:.2f}'><title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
         )
-        parts.append(f"<text x='{x + 10:.2f}' y='{y - 10:.2f}'>{label}</text>")
+        parts.append(f"<text x='{x + radius + 2:.2f}' y='{y - radius:.2f}'>{label}</text>")
 
-    parts.extend(["</svg>", "</body>", "</html>"])
+    parts.extend([
+        "</g>",
+        "</svg>",
+        "<div id='legend' style='position:absolute;right:10px;top:10px;background:#fff;padding:6px;border:1px solid #ccc'>",
+        "<strong>Легенда</strong>",
+        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#fff7ae' stroke-width='3'/></svg> Сила 1</div>",
+        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#b2ffb2' stroke-width='4.5'/></svg> Сила 2-3</div>",
+        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#b2e1ff' stroke-width='6'/></svg> Сила 4-5</div>",
+        "<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='#d7b2ff' stroke-width='7.5'/></svg> 6+</div>",
+        "</div>",
+        "<script>const svg=d3.select('#svggraph');const g=d3.select('#graph');svg.call(d3.zoom().on('zoom',e=>g.attr('transform',e.transform)));</script>",
+        "</body>",
+        "</html>",
+    ])
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
