@@ -49,8 +49,9 @@ Follow these steps even if you have never written code before.
 7. **Send a chat export**. Use Telegram’s built‑in export feature to save a chat
    history as a JSON file (usually named `result.json`). Send this file to your
    bot. After the upload finishes, the bot will analyze the chat and reply first
-   with a PNG image containing the interaction graph, followed by a PDF report
-   with a structured table of metrics.
+   with a PNG image containing the interaction graph, an HTML file with an
+   interactive version of the graph, and a PDF report with a structured table of
+   metrics.
 
 That’s all! Every time you restart the bot you will need to set the
 `TG_BOT_TOKEN` environment variable again, so keep your token somewhere safe.

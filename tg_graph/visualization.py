@@ -72,3 +72,67 @@ def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) ->
     plt.tight_layout()
     plt.savefig(path, format="png", bbox_inches="tight")
     plt.close()
+
+
+def visualize_graph_html(G: nx.MultiDiGraph, path: str) -> None:
+    """Save an interactive graph visualisation as a standalone HTML file."""
+
+    pos = nx.spring_layout(G, k=2.0, seed=42)
+
+    coords = list(pos.values())
+    min_dist = None
+    for i, (x1, y1) in enumerate(coords):
+        for x2, y2 in coords[i + 1 :]:
+            d = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+            if min_dist is None or d < min_dist:
+                min_dist = d
+    if not min_dist:
+        min_dist = 0.01
+
+    scale = 60.0 / min_dist  # 15 mm ~ 60 px
+    scaled = {n: (x * scale, y * scale) for n, (x, y) in pos.items()}
+
+    xs = [x for x, _ in scaled.values()]
+    ys = [y for _, y in scaled.values()]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+
+    margin = 50
+    width = int(max_x - min_x + 2 * margin)
+    height = int(max_y - min_y + 2 * margin)
+
+    shifted = {n: (x - min_x + margin, y - min_y + margin) for n, (x, y) in scaled.items()}
+
+    parts = [
+        "<!DOCTYPE html>",
+        "<html>",
+        "<head>",
+        "<meta charset='utf-8'>",
+        "<style>",
+        "line {stroke: gray; stroke-width: 1.5; opacity: 0.7;}",
+        "line:hover {stroke: red; stroke-width: 3;}",
+        "circle {fill: #1f77b4; stroke: black; stroke-width: 1;}",
+        "text {font-size: 12px; font-family: Arial, sans-serif;}",
+        "</style>",
+        "</head>",
+        "<body>",
+        f"<svg width='{width}' height='{height}'>",
+    ]
+
+    for u, v, data in G.edges(data=True):
+        x1, y1 = shifted[u]
+        x2, y2 = shifted[v]
+        w = float(data.get("weight", 1.0))
+        parts.append(
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}'><title>\u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
+        )
+
+    for node, (x, y) in shifted.items():
+        label = sanitize_text(str(node))
+        parts.append(f"<circle cx='{x:.2f}' cy='{y:.2f}' r='8'><title>{label}</title></circle>")
+        parts.append(f"<text x='{x + 10:.2f}' y='{y - 10:.2f}'>{label}</text>")
+
+    parts.extend(["</svg>", "</body>", "</html>"])
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(parts))
