@@ -253,7 +253,7 @@ def visualize_graph_html(
             "strength": node_strengths.get(n, 0.0),
         }
         for n in agg.nodes()
-        if sanitize_text(str(n))
+        if sanitize_text(str(n)) and degrees.get(n, 0) > 0
     ]
 
     links = [
@@ -288,7 +288,7 @@ def visualize_graph_html(
         "<body>",
         f"<svg id='svggraph' width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
         "<defs>",
-        "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='3' markerHeight='3' orient='auto-start-reverse'>",
+        "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='0.6' markerHeight='0.6' orient='auto-start-reverse'>",
         "<path d='M 0 0 L 10 5 L 0 10 z' fill='context-stroke' />",
         "</marker>",
         "</defs>",
@@ -322,9 +322,9 @@ def visualize_graph_html(
         "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label)",
         "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
         "const simulation = d3.forceSimulation(nodes)",
-        "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 120 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
-        "    .force('charge', d3.forceManyBody().strength(-80))",
-        "    .force('collide', d3.forceCollide().radius(d => d.radius + 5))",
+        "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 150 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
+        "    .force('charge', d3.forceManyBody().strength(-500))",
+        "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
         "    .force('center', d3.forceCenter("+str(width/2)+", "+str(height/2)+"));",
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
