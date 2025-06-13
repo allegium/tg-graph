@@ -37,10 +37,12 @@ def _cluster_layout(
     pos: Dict[str, tuple] = {}
     cluster_map: Dict[str, int] = {}
     angle_step = 2 * math.pi / len(communities)
-    radius = 12.0
+    # Increase radius between cluster centres so clusters are further apart
+    radius = 18.0
     for idx, community in enumerate(communities):
         sub = G.subgraph(community)
-        sub_pos = nx.spring_layout(sub, k=4.0, seed=42, weight=weight)
+        # Reduce k to pull nodes of the same cluster closer together
+        sub_pos = nx.spring_layout(sub, k=2.0, seed=42, weight=weight)
         angle = angle_step * idx
         cx = radius * math.cos(angle)
         cy = radius * math.sin(angle)
@@ -312,7 +314,7 @@ def visualize_graph_html(
         "const g = d3.select('#graph');",
         "const clusters = Array.from(new Set(nodes.map(n => n.cluster)));",
         "const clusterCenters = {};",
-        "const radius = Math.min("+str(width)+", "+str(height)+") / 2.5;",
+        "const radius = Math.min("+str(width)+", "+str(height)+") / 2;",
         "clusters.forEach((c, i) => {",
         "    const angle = 2 * Math.PI * i / clusters.length;",
         "    clusterCenters[c] = {x: "+str(width/2)+" + radius * Math.cos(angle), y: "+str(height/2)+" + radius * Math.sin(angle)};",
@@ -334,10 +336,10 @@ def visualize_graph_html(
         "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 150 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
-        "    .force('charge', d3.forceManyBody().strength(-7000))",
+        "    .force('charge', d3.forceManyBody().strength(-9000))",
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
-        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.1))",
-        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.1))",
+        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.2))",
+        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.2))",
         "    .force('center', d3.forceCenter("+str(width/2)+", "+str(height/2)+"));",
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
