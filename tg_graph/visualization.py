@@ -77,16 +77,8 @@ def _edge_opacity(weight: float) -> float:
 
 
 def _node_radius(degree: int) -> float:
-    """Return base node radius from the number of connections."""
+    """Return node radius based on the total number of connections."""
     return 6.0 + degree * 2.0
-
-
-def _node_scale(strength: float, max_strength: float) -> float:
-    """Return a scaling factor in ``[1, 4]`` based on node strength."""
-    if max_strength <= 0:
-        return 1.0
-    scale = 1.0 + 3.0 * (strength / max_strength)
-    return min(scale, 4.0)
 
 
 def _cluster_color(index: int) -> str:
@@ -153,23 +145,13 @@ def visualize_graph(
             pos[n] = (x * 0.2, y * 0.2)
     weights = [float(data.get("weight", 1.0)) for *_, data in agg.edges(data=True)]
 
-    node_strengths: Dict[str, float] = {}
-    for (u, v), w in strengths.items():
-        if u in valid_nodes:
-            node_strengths[u] = node_strengths.get(u, 0.0) + w
-        if v in valid_nodes:
-            node_strengths[v] = node_strengths.get(v, 0.0) + w
-    max_strength = max(node_strengths.values(), default=0.0)
-
-    node_sizes = []
-    for n in agg.nodes():
-        base_r = _node_radius(degrees.get(n, 0))
-        scale = _node_scale(node_strengths.get(n, 0.0), max_strength)
-        node_sizes.append((base_r * scale) ** 2)
+    node_sizes = [_node_radius(degrees.get(n, 0)) ** 2 for n in agg.nodes()]
 
     # Sanitize labels so exotic symbols do not break the font
     # Only include labels for nodes that will actually be drawn
     labels = {node: sanitize_text(str(node)) for node in agg.nodes()}
+    label_pos = _adjust_label_positions(pos)
+
     node_colors = [_cluster_color(clusters.get(n, 0)) for n in agg.nodes()]
     nx.draw_networkx_nodes(
         agg,
@@ -202,12 +184,11 @@ def visualize_graph(
 
     nx.draw_networkx_labels(
         agg,
-        pos,
+        label_pos,
         labels=labels,
         font_size=7,
-        font_color="white",
-        horizontalalignment="center",
-        verticalalignment="center",
+        font_color="black",
+        bbox=dict(facecolor="white", edgecolor="none", pad=0.2, alpha=0.8),
     )
 
     plt.axis("off")
@@ -243,24 +224,17 @@ def visualize_graph_html(
         if u in valid_nodes and v in valid_nodes and w >= min_strength:
             agg.add_edge(u, v, weight=w)
     degrees = dict(agg.degree())
+    node_radii = {n: _node_radius(deg) for n, deg in degrees.items()}
+
+    _, clusters = _cluster_layout(agg, weight="weight")
+    node_colors = {n: _cluster_color(clusters.get(n, 0)) for n in agg.nodes()}
+
     node_strengths: Dict[str, float] = {}
     for (u, v), w in strengths.items():
         if u in valid_nodes:
             node_strengths[u] = node_strengths.get(u, 0.0) + w
         if v in valid_nodes:
             node_strengths[v] = node_strengths.get(v, 0.0) + w
-
-    max_strength = max(node_strengths.values(), default=0.0)
-
-    node_radii = {
-        n: _node_radius(deg) * _node_scale(node_strengths.get(n, 0.0), max_strength)
-        for n, deg in degrees.items()
-    }
-
-    _, clusters = _cluster_layout(agg, weight="weight")
-    node_colors = {n: _cluster_color(clusters.get(n, 0)) for n in agg.nodes()}
-
-    # ``node_strengths`` dictionary is already populated above
 
     width = 960
     height = 720
@@ -320,7 +294,7 @@ def visualize_graph_html(
         f"<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='{_edge_color(1)}' stroke-width='{_edge_width(1):.1f}'/></svg> Слабая связь</div>",
         f"<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='{_edge_color(3)}' stroke-width='{_edge_width(3):.1f}'/></svg> Средняя связь</div>",
         f"<div><svg width='40' height='6'><line x1='0' y1='3' x2='40' y2='3' stroke='{_edge_color(6)}' stroke-width='{_edge_width(6):.1f}'/></svg> Сильная связь</div>",
-        "<div style='margin-top:4px'>Размер круга \u2014 сила взаимодействия</div>",
+        "<div style='margin-top:4px'>Размер круга \u2014 число связей</div>",
         "<div>Цвет круга \u2014 кластер</div>",
         "</div>",
         "<script>",
@@ -340,7 +314,7 @@ def visualize_graph_html(
         "    .attr('fill', d => d.color)",
         "    .call(d3.drag().on('start', dragStarted).on('drag', dragged).on('end', dragEnded));",
         "node.append('title').text(d => d.label + ' | \u0421\u0438\u043b\u0430: ' + d.strength.toFixed(2));",
-        "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label).attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
+        "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label);",
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 120 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
         "    .force('charge', d3.forceManyBody().strength(-80))",
@@ -349,7 +323,7 @@ def visualize_graph_html(
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
         "    node.attr('cx', d => d.x).attr('cy', d => d.y);",
-        "    label.attr('x', d => d.x).attr('y', d => d.y);",
+        "    label.attr('x', d => d.x + d.radius + 2).attr('y', d => d.y - d.radius);",
         "});",
         "function dragStarted(event, d){ if(!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }",
         "function dragged(event, d){ d.fx = event.x; d.fy = event.y; }",
