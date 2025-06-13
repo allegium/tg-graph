@@ -142,9 +142,24 @@ def visualize_graph(
 
 
 def visualize_graph_html(
-    G: nx.MultiDiGraph, strengths: Dict[Tuple[str, str], float], path: str
+    G: nx.MultiDiGraph,
+    strengths: Dict[Tuple[str, str], float],
+    path: str,
+    min_strength: float = 2.0,
 ) -> None:
-    """Save an interactive graph visualisation as a standalone HTML file."""
+    """Save an interactive graph visualisation as a standalone HTML file.
+
+    Parameters
+    ----------
+    G : nx.MultiDiGraph
+        Graph of interactions.
+    strengths : Dict[Tuple[str, str], float]
+        Aggregated edge weights between nodes.
+    path : str
+        Destination file for the HTML.
+    min_strength : float, optional
+        Threshold for displaying edges, by default 2.0.
+    """
 
     agg = nx.DiGraph()
     valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
@@ -161,6 +176,8 @@ def visualize_graph_html(
             node_strengths[u] = node_strengths.get(u, 0.0) + w
         if v in valid_nodes:
             node_strengths[v] = node_strengths.get(v, 0.0) + w
+
+    degrees = dict(agg.degree())
 
     coords = list(pos.values())
     min_dist = None
@@ -194,20 +211,37 @@ def visualize_graph_html(
         "<head>",
         "<meta charset='utf-8'>",
         "<style>",
-        "line {stroke-width: 1.5; opacity: 0.7;}",
-        "line:hover {stroke: red; stroke-width: 3;}",
-        "circle {fill: #1f77b4; stroke: black; stroke-width: 1;}",
-        "circle:hover {fill: orange;}",
-        "text {font-size: 12px; font-family: Arial, sans-serif;}",
+        "body {background:#ffffff; margin:0; overflow:hidden; font-family:Arial, sans-serif; font-size:12px;}",
+        "svg {width:100%; height:100%;}",
+        "line {transition:opacity .2s, stroke-width .2s;}",
+        "circle {fill:#1f77b4; stroke:black; stroke-width:1;}",
+        "circle:hover {fill:orange;}",
+        "text {font-size:12px; font-family:Arial, sans-serif;}",
         "</style>",
         "</head>",
         "<body>",
-        f"<svg width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
+        f"<svg viewBox='0 0 {width} {height}' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>",
         "<defs>",
         "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='3' markerHeight='3' orient='auto-start-reverse'>",
         "<path d='M 0 0 L 10 5 L 0 10 z' fill='context-stroke' />",
         "</marker>",
         "</defs>",
+        "<g id='legend' transform='translate(20,20)'>",
+        "<rect x='0' y='0' width='140' height='110' fill='white' stroke='black' stroke-width='0.5' />",
+        "<text x='10' y='15'>\u041b\u0435\u0433\u0435\u043d\u0434\u0430</text>",
+        f"<line x1='10' y1='30' x2='40' y2='30' stroke='#fff7ae' stroke-width='{1 + 1*1.5:.1f}' />",
+        "<text x='50' y='34'>\u0441\u0438\u043b\u0430 1</text>",
+        f"<line x1='10' y1='45' x2='40' y2='45' stroke='#b2ffb2' stroke-width='{1 + 3*1.5:.1f}' />",
+        "<text x='50' y='49'>\u0441\u0438\u043b\u0430 3</text>",
+        f"<line x1='10' y1='60' x2='40' y2='60' stroke='#b2e1ff' stroke-width='{1 + 5*1.5:.1f}' />",
+        "<text x='50' y='64'>\u0441\u0438\u043b\u0430 5</text>",
+        f"<line x1='10' y1='75' x2='40' y2='75' stroke='#d7b2ff' stroke-width='{1 + 7*1.5:.1f}' />",
+        "<text x='50' y='79'>\u0441\u0438\u043b\u0430 7+</text>",
+        "<circle cx='20' cy='95' r='5' stroke='black' fill='#1f77b4' />",
+        "<text x='50' y='99'>\u043c\u0435\u043d\u044c\u0448\u0435 \u0441\u0432\u044f\u0437\u0435\u0439</text>",
+        "<circle cx='20' cy='110' r='10' stroke='black' fill='#1f77b4' />",
+        "<text x='50' y='114'>\u0431\u043e\u043b\u044c\u0448\u0435 \u0441\u0432\u044f\u0437\u0435\u0439</text>",
+        "</g>",
     ]
 
     def _color(weight: float) -> str:
@@ -224,16 +258,17 @@ def visualize_graph_html(
             # Skip edges for nodes that are not displayed
             continue
         w = float(data.get("weight", 1.0))
+        if w < min_strength:
+            continue
         x1, y1 = shifted[u]
         x2, y2 = shifted[v]
         su = sanitize_text(str(u))
         sv = sanitize_text(str(v))
         color = _color(w)
+        width = 1 + w * 1.5
+        opacity = 0.3 + 0.05 * w
         parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:black; stroke-width:{w * 2.0 + 2:.2f}; opacity:1; pointer-events:none'></line>"
-        )
-        parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{w * 2.0:.2f}'>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{width:.2f}; opacity:{opacity:.2f}'>"
             f"<title>{su} \u2192 {sv} | \u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
         )
 
@@ -242,12 +277,19 @@ def visualize_graph_html(
         if not label:
             continue
         strength = node_strengths.get(node, 0.0)
+        radius = 5 + 0.5 * degrees.get(node, 0)
         parts.append(
-            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='8'><title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{radius:.2f}'><title>{label} | \u0421\u0438\u043b\u0430: {strength:.2f}</title></circle>"
         )
-        parts.append(f"<text x='{x + 10:.2f}' y='{y - 10:.2f}'>{label}</text>")
+        parts.append(f"<text x='{x + radius + 2:.2f}' y='{y - radius:.2f}'>{label}</text>")
 
-    parts.extend(["</svg>", "</body>", "</html>"])
+    parts.extend([
+        "</svg>",
+        "<script src='https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js'></script>",
+        "<script>svgPanZoom(document.querySelector('svg'), {zoomEnabled: true, controlIconsEnabled: true});</script>",
+        "</body>",
+        "</html>",
+    ])
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
