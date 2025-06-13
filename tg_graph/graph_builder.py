@@ -40,10 +40,13 @@ def build_graph(
     last_message = None
     for m in messages:
         author = m.from_name
-        if not author or author.lower() == "user":
+        if (
+            not author
+            or author.lower() == "user"
+            or author == "Unknown"
+        ):
             last_message = m
             continue
-        G.add_node(author)
         if m.reply_to:
             target_msg = msg_map.get(m.reply_to)
             if target_msg and target_msg.from_name and target_msg.from_name.lower() != "user":
@@ -64,7 +67,7 @@ def build_graph(
             else:
                 fwd = str(fwd)
             target = user_map.get(fwd) or username_map.get(fwd.lstrip('@')) or "Unknown"
-            if target.lower() != "user":
+            if target.lower() != "user" and target != "Unknown":
                 G.add_edge(author, target, weight=INTERACTION_WEIGHTS['forward'])
         if m.reactions:
             for reaction in m.reactions:
@@ -75,7 +78,7 @@ def build_graph(
                     else:
                         actor = str(actor)
                     actor_name = user_map.get(actor) or username_map.get(actor.lstrip('@')) or "Unknown"
-                    if actor_name.lower() != "user":
+                    if actor_name.lower() != "user" and actor_name != "Unknown":
                         G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and median_delta > 0:
             prev_author = last_message.from_name
@@ -86,4 +89,11 @@ def build_graph(
                     weight=INTERACTION_WEIGHTS['temporal'],
                 )
         last_message = m
+    # Remove isolated or unnamed nodes
+    to_remove = [
+        n
+        for n in list(G.nodes())
+        if G.degree(n) == 0 or not n or n == "Unknown"
+    ]
+    G.remove_nodes_from(to_remove)
     return G
