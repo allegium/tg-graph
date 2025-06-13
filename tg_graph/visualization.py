@@ -37,7 +37,7 @@ def _cluster_layout(
     pos: Dict[str, tuple] = {}
     cluster_map: Dict[str, int] = {}
     angle_step = 2 * math.pi / len(communities)
-    radius = 8.0
+    radius = 12.0
     for idx, community in enumerate(communities):
         sub = G.subgraph(community)
         sub_pos = nx.spring_layout(sub, k=4.0, seed=42, weight=weight)
@@ -82,7 +82,7 @@ def _node_radius(degree: int) -> float:
     The value is capped so that very active participants do not create
     disproportionately large circles in the visualisation.
     """
-    return min(10.0, 6.0 + degree * 2.0)
+    return min(20.0, 6.0 + degree * 2.0)
 
 
 def _cluster_color(index: int) -> str:
@@ -251,6 +251,7 @@ def visualize_graph_html(
             "radius": node_radii.get(n, 6.0),
             "color": node_colors.get(n, "#1f77b4"),
             "strength": node_strengths.get(n, 0.0),
+            "cluster": clusters.get(n, 0),
         }
         for n in agg.nodes()
         if sanitize_text(str(n)) and degrees.get(n, 0) > 0
@@ -263,6 +264,8 @@ def visualize_graph_html(
             "weight": float(data.get("weight", 1.0)),
             "color": _edge_color(float(data.get("weight", 1.0))),
             "width": _edge_width(float(data.get("weight", 1.0))),
+            "source_label": sanitize_text(str(u)),
+            "target_label": sanitize_text(str(v)),
         }
         for u, v, data in agg.edges(data=True)
     ]
@@ -307,13 +310,21 @@ def visualize_graph_html(
         "const links = "+links_json+";",
         "const svg = d3.select('#svggraph');",
         "const g = d3.select('#graph');",
+        "const clusters = Array.from(new Set(nodes.map(n => n.cluster)));",
+        "const clusterCenters = {};",
+        "const radius = Math.min("+str(width)+", "+str(height)+") / 2.5;",
+        "clusters.forEach((c, i) => {",
+        "    const angle = 2 * Math.PI * i / clusters.length;",
+        "    clusterCenters[c] = {x: "+str(width/2)+" + radius * Math.cos(angle), y: "+str(height/2)+" + radius * Math.sin(angle)};",
+        "});",
         "svg.call(d3.zoom().on('zoom', e => g.attr('transform', e.transform)));",
         "const link = g.selectAll('line').data(links).enter().append('line')",
         "    .attr('stroke', d => d.color)",
         "    .attr('stroke-width', d => d.width)",
         "    .attr('marker-end', 'url(#arrow)')",
         "    .on('mouseover', function(event, d){ d3.select(this).attr('stroke','red').attr('stroke-width', d.width + 2); })",
-        "    .on('mouseout', function(event, d){ d3.select(this).attr('stroke', d.color).attr('stroke-width', d.width); });",
+        "    .on('mouseout', function(event, d){ d3.select(this).attr('stroke', d.color).attr('stroke-width', d.width); })",
+        "    .append('title').text(d => d.source_label + ' \u2192 ' + d.target_label + ' | \u0421\u0438\u043b\u0430: ' + d.weight.toFixed(2));",
         "const node = g.selectAll('circle').data(nodes).enter().append('circle')",
         "    .attr('r', d => d.radius)",
         "    .attr('fill', d => d.color)",
@@ -323,8 +334,10 @@ def visualize_graph_html(
         "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 150 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
-        "    .force('charge', d3.forceManyBody().strength(-500))",
+        "    .force('charge', d3.forceManyBody().strength(-3000))",
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
+        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.1))",
+        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.1))",
         "    .force('center', d3.forceCenter("+str(width/2)+", "+str(height/2)+"));",
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
