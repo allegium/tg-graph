@@ -51,7 +51,10 @@ Follow these steps even if you have never written code before.
    bot. After the upload finishes, the bot will analyze the chat and reply first
    with a PNG image containing the interaction graph, an HTML file with an
    interactive version of the graph, and a PDF report with a structured table of
-   metrics.
+   metrics. The HTML graph highlights nodes and edges on hover, shows the
+   participants of every connection and uses thicker lines for stronger
+   interactions.
+   Nodes without connections or with unknown names are omitted to keep the graph clear.
 
 That’s all! Every time you restart the bot you will need to set the
 `TG_BOT_TOKEN` environment variable again, so keep your token somewhere safe.

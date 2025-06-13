@@ -1,6 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from typing import Dict
+from typing import Dict, Tuple
 from .utils import sanitize_text
 
 
@@ -18,30 +18,44 @@ def _adjust_label_positions(pos: Dict[str, tuple], min_dist: float = 0.05) -> Di
 plt.rcParams["font.family"] = "DejaVu Sans"
 
 
-def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) -> None:
-    """Save an interaction graph as a high resolution PNG image."""
+def visualize_graph(
+    G: nx.MultiDiGraph,
+    metrics: Dict[str, float],
+    strengths: Dict[Tuple[str, str], float],
+    path: str,
+) -> None:
+    """Save an interaction graph as a high resolution PNG image.
+
+    The width of each edge reflects the cumulative strength of interactions
+    between participants.
+    """
 
     # Larger figure with high DPI for readability
     plt.figure(figsize=(12, 10), dpi=200)
 
+    agg = nx.DiGraph()
+    agg.add_nodes_from(G.nodes())
+    for (u, v), w in strengths.items():
+        agg.add_edge(u, v, weight=w)
+
     # Spread nodes further apart so that labels do not overlap
-    pos = nx.spring_layout(G, k=2.0, seed=42)
+    pos = nx.spring_layout(agg, k=2.0, seed=42, weight="weight")
     # Move the most connected nodes closer to the center
-    degrees = dict(G.degree())
+    degrees = dict(agg.degree())
     if degrees:
         top_nodes = sorted(degrees, key=degrees.get, reverse=True)[:3]
         for n in top_nodes:
             x, y = pos[n]
             pos[n] = (x * 0.2, y * 0.2)
-    weights = [float(data.get("weight", 1.0)) for *_, data in G.edges(data=True)]
+    weights = [float(data.get("weight", 1.0)) for *_, data in agg.edges(data=True)]
 
     # Sanitize labels so exotic symbols do not break the font
     labels = {node: sanitize_text(str(node)) for node in G.nodes()}
     label_pos = _adjust_label_positions(pos)
 
-    node_colors = range(G.number_of_nodes())
+    node_colors = range(agg.number_of_nodes())
     nx.draw_networkx_nodes(
-        G,
+        agg,
         pos,
         node_size=150,
         node_color=node_colors,
@@ -51,7 +65,7 @@ def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) ->
     )
 
     nx.draw_networkx_edges(
-        G,
+        agg,
         pos,
         width=[w * 2.0 for w in weights],
         alpha=0.7,
@@ -60,7 +74,7 @@ def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) ->
     )
 
     nx.draw_networkx_labels(
-        G,
+        agg,
         label_pos,
         labels=labels,
         font_size=7,
@@ -74,10 +88,17 @@ def visualize_graph(G: nx.MultiDiGraph, metrics: Dict[str, float], path: str) ->
     plt.close()
 
 
-def visualize_graph_html(G: nx.MultiDiGraph, path: str) -> None:
+def visualize_graph_html(
+    G: nx.MultiDiGraph, strengths: Dict[Tuple[str, str], float], path: str
+) -> None:
     """Save an interactive graph visualisation as a standalone HTML file."""
 
-    pos = nx.spring_layout(G, k=2.0, seed=42)
+    agg = nx.DiGraph()
+    agg.add_nodes_from(G.nodes())
+    for (u, v), w in strengths.items():
+        agg.add_edge(u, v, weight=w)
+
+    pos = nx.spring_layout(agg, k=2.0, seed=42, weight="weight")
 
     coords = list(pos.values())
     min_dist = None
@@ -112,19 +133,27 @@ def visualize_graph_html(G: nx.MultiDiGraph, path: str) -> None:
         "line {stroke: gray; stroke-width: 1.5; opacity: 0.7;}",
         "line:hover {stroke: red; stroke-width: 3;}",
         "circle {fill: #1f77b4; stroke: black; stroke-width: 1;}",
+        "circle:hover {fill: orange;}",
         "text {font-size: 12px; font-family: Arial, sans-serif;}",
         "</style>",
         "</head>",
         "<body>",
-        f"<svg width='{width}' height='{height}'>",
+        f"<svg width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
+        "<defs>",
+        "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='6' markerHeight='6' orient='auto-start-reverse'>",
+        "<path d='M 0 0 L 10 5 L 0 10 z' fill='gray' />",
+        "</marker>",
+        "</defs>",
     ]
 
-    for u, v, data in G.edges(data=True):
+    for (u, v), w in strengths.items():
         x1, y1 = shifted[u]
         x2, y2 = shifted[v]
-        w = float(data.get("weight", 1.0))
+        su = sanitize_text(str(u))
+        sv = sanitize_text(str(v))
         parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}'><title>\u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke-width:{w * 2.0:.2f}'>"
+            f"<title>{su} \u2192 {sv} | \u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
         )
 
     for node, (x, y) in shifted.items():
