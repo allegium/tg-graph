@@ -11,6 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from matplotlib import font_manager as fm
 from typing import Dict, List, Tuple
 
 
@@ -38,8 +39,12 @@ def build_pdf(
     strengths: Dict[Tuple[str, str], float],
     path: str,
 ) -> None:
-    pdfmetrics.registerFont(TTFont("DejaVuSans", "DejaVuSans.ttf"))
-    pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", "DejaVuSans-Bold.ttf"))
+    regular_font = fm.findfont(fm.FontProperties(family="DejaVu Sans"))
+    bold_font = fm.findfont(
+        fm.FontProperties(family="DejaVu Sans", weight="bold")
+    )
+    pdfmetrics.registerFont(TTFont("DejaVuSans", regular_font))
+    pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold_font))
     doc = SimpleDocTemplate(path, pagesize=A4)
     styles = getSampleStyleSheet()
     for name in styles.byName:
