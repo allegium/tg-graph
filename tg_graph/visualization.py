@@ -354,7 +354,7 @@ def visualize_graph_html(
         "            const base = Math.min(d.weight / 6, 1);",
         "            const cf = d.source.cluster === d.target.cluster ? 3 : 1 / 3;",
         "            // Reduce overall attraction and bias toward same clusters",
-        "            return base * cf * 0.1;",
+        "            return base * cf * 0.0001;",
         "        }))",
         "    .force('charge', d3.forceManyBody().strength(-14000))",
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
