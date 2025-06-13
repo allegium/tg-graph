@@ -38,15 +38,19 @@ Follow these steps even if you have never written code before.
    set TG_BOT_TOKEN=TOKEN
    ```
 
-6. **Start the bot**. Still in the project folder, run:
+6. **Start the bot**. You can run it directly from the command line. Still in
+   the project folder execute:
 
    ```bash
-   python -m tg_graph.bot
+   python -m tg_graph --token TOKEN
    ```
 
-   You should see a message that the bot has started and is waiting for files.
+   Replace `TOKEN` with the value you received from BotFather. Alternatively you
+   can set the `TG_BOT_TOKEN` environment variable instead of passing
+   ``--token``. After running the command you should see a message that the bot
+   has started and is waiting for files.
 
-   If you prefer not to use the command line, simply double-click
+   If you prefer not to use the command line, you can still double-click
    `launch_bot.py` in the project folder. A small window will appear where you
    can paste the bot token and press **"Запустить"**. The bot will start in the
    background and the window will remain open so you can close it to stop the
