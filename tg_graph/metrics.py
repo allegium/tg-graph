@@ -1,6 +1,5 @@
 import networkx as nx
 from typing import Dict, Iterable
-from .utils import sanitize_text
 
 
 def _simple_pagerank(
@@ -94,8 +93,6 @@ def compute_interaction_strengths(G: nx.MultiDiGraph) -> Dict[tuple, float]:
     """Aggregate edge weights between every pair of participants."""
     strengths: Dict[tuple, float] = {}
     for u, v, data in G.edges(data=True):
-        if not sanitize_text(str(u)) or not sanitize_text(str(v)):
-            continue
         key = (u, v)
         strengths[key] = strengths.get(key, 0.0) + float(data.get("weight", 1.0))
     return strengths
@@ -106,8 +103,6 @@ def compute_node_strengths(G: nx.MultiDiGraph) -> Dict[str, float]:
     totals: Dict[str, float] = {}
     for u, v, data in G.edges(data=True):
         w = float(data.get("weight", 1.0))
-        if sanitize_text(str(u)):
-            totals[u] = totals.get(u, 0.0) + w
-        if sanitize_text(str(v)):
-            totals[v] = totals.get(v, 0.0) + w
+        totals[u] = totals.get(u, 0.0) + w
+        totals[v] = totals.get(v, 0.0) + w
     return totals
