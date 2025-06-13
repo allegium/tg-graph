@@ -13,7 +13,6 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from matplotlib import font_manager as fm
 from typing import Dict, List, Tuple
-from .utils import sanitize_text
 
 
 def _format_metrics(metrics: Dict[str, float]) -> List[List[str]]:
@@ -80,11 +79,7 @@ def build_pdf(
         story.append(Paragraph("Сила связей", styles["Heading2"]))
         rows = [["От", "Кому", "Сила"]]
         for (src, dst), val in sorted(strengths.items(), key=lambda x: x[1], reverse=True):
-            s_src = sanitize_text(str(src))
-            s_dst = sanitize_text(str(dst))
-            if not s_src or not s_dst:
-                continue
-            rows.append([s_src, s_dst, f"{val:.2f}"])
+            rows.append([src, dst, f"{val:.2f}"])
         s_table = Table(rows, hAlign="LEFT", colWidths=[150, 150, 80])
         s_table.setStyle(
             TableStyle(
