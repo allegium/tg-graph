@@ -81,10 +81,11 @@ def _edge_opacity(weight: float) -> float:
 def _node_radius(degree: int) -> float:
     """Return node radius based on the total number of connections.
 
-    The value is capped so that very active participants do not create
-    disproportionately large circles in the visualisation.
+    The radius grows gradually with increasing degree but is capped at 30 so
+    that very active participants do not create disproportionately large
+    circles in the visualisation.
     """
-    return min(20.0, 6.0 + degree * 2.0)
+    return min(30.0, 6.0 + degree * 1.1)
 
 
 def _cluster_color(index: int) -> str:
@@ -349,7 +350,12 @@ def visualize_graph_html(
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id)"
         "        .distance(d => 150 / Math.max(d.weight, 0.1))"
-        "        .strength(d => { const base = Math.min(d.weight / 6, 1); const cf = d.source.cluster === d.target.cluster ? 3 : 1/3; return base * cf * 0.1; }))",
+        "        .strength(d => {",
+        "            const base = Math.min(d.weight / 6, 1);",
+        "            const cf = d.source.cluster === d.target.cluster ? 3 : 1 / 3;",
+        "            // Reduce overall attraction and bias toward same clusters",
+        "            return base * cf * 0.1;",
+        "        }))",
         "    .force('charge', d3.forceManyBody().strength(-14000))",
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
         "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(1.8))",
