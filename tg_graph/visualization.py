@@ -172,7 +172,11 @@ def visualize_graph_html(
             return "#b2e1ff"  # pastel blue
         return "#d7b2ff"  # pastel purple
 
-    for (u, v), w in strengths.items():
+    for u, v, data in agg.edges(data=True):
+        if u not in shifted or v not in shifted:
+            # Skip edges for nodes that are not displayed
+            continue
+        w = float(data.get("weight", 1.0))
         x1, y1 = shifted[u]
         x2, y2 = shifted[v]
         su = sanitize_text(str(u))
