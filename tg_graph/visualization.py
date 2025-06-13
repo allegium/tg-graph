@@ -77,8 +77,12 @@ def _edge_opacity(weight: float) -> float:
 
 
 def _node_radius(degree: int) -> float:
-    """Return node radius based on the total number of connections."""
-    return 6.0 + degree * 2.0
+    """Return node radius based on the total number of connections.
+
+    The value is capped so that very active participants do not create
+    disproportionately large circles in the visualisation.
+    """
+    return min(10.0, 6.0 + degree * 2.0)
 
 
 def _cluster_color(index: int) -> str:
@@ -150,7 +154,7 @@ def visualize_graph(
     # Sanitize labels so exotic symbols do not break the font
     # Only include labels for nodes that will actually be drawn
     labels = {node: sanitize_text(str(node)) for node in agg.nodes()}
-    label_pos = _adjust_label_positions(pos)
+    label_pos = pos
 
     node_colors = [_cluster_color(clusters.get(n, 0)) for n in agg.nodes()]
     nx.draw_networkx_nodes(
@@ -187,8 +191,9 @@ def visualize_graph(
         label_pos,
         labels=labels,
         font_size=7,
-        font_color="black",
-        bbox=dict(facecolor="white", edgecolor="none", pad=0.2, alpha=0.8),
+        font_color="white",
+        horizontalalignment="center",
+        verticalalignment="center",
     )
 
     plt.axis("off")
@@ -314,7 +319,8 @@ def visualize_graph_html(
         "    .attr('fill', d => d.color)",
         "    .call(d3.drag().on('start', dragStarted).on('drag', dragged).on('end', dragEnded));",
         "node.append('title').text(d => d.label + ' | \u0421\u0438\u043b\u0430: ' + d.strength.toFixed(2));",
-        "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label);",
+        "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label)",
+        "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 120 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
         "    .force('charge', d3.forceManyBody().strength(-80))",
@@ -323,7 +329,7 @@ def visualize_graph_html(
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
         "    node.attr('cx', d => d.x).attr('cy', d => d.y);",
-        "    label.attr('x', d => d.x + d.radius + 2).attr('y', d => d.y - d.radius);",
+        "    label.attr('x', d => d.x).attr('y', d => d.y);",
         "});",
         "function dragStarted(event, d){ if(!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }",
         "function dragged(event, d){ d.fx = event.x; d.fy = event.y; }",
