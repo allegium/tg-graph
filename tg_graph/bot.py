@@ -39,8 +39,15 @@ async def process_document(message: types.Message, file_path: str, workdir: str)
     data = load_chat(file_path)
     messages = parse_messages(data)
     users = parse_users(data)
-    user_map = {u.id: (u.name or u.username or 'Unknown') for u in users}
-    username_map = {u.username: (u.name or u.username) for u in users if u.username}
+    user_map = {
+        u.id: (u.name or ("@" + u.username) if u.username else "Unknown")
+        for u in users
+    }
+    username_map = {
+        u.username: (u.name or "@" + u.username)
+        for u in users
+        if u.username
+    }
     del data  # free memory early
 
     median = compute_median_delta(messages)

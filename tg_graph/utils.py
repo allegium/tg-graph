@@ -2,7 +2,8 @@ import unicodedata
 
 
 def sanitize_text(text: str) -> str:
-    """Normalize text and strip characters unsupported by common fonts."""
-    normalized = unicodedata.normalize("NFKD", text)
-    ascii_bytes = normalized.encode("ascii", "ignore")
-    return ascii_bytes.decode("ascii")
+    """Normalize text and remove control characters while keeping Unicode."""
+    normalized = unicodedata.normalize("NFC", text)
+    return "".join(
+        ch for ch in normalized if not unicodedata.category(ch).startswith("C")
+    ).strip()
