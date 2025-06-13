@@ -40,18 +40,29 @@ def build_graph(
     last_message = None
     for m in messages:
         author = m.from_name
-        if (
-            not author
-            or author.lower() == "user"
-            or author == "Unknown"
-        ):
+        if not author or author.lower() == "user" or author == "Unknown":
+            if m.from_id:
+                author = user_map.get(str(m.from_id)) or username_map.get(
+                    str(m.from_id)
+                )
+        if not author:
             last_message = m
             continue
         if m.reply_to:
             target_msg = msg_map.get(m.reply_to)
-            if target_msg and target_msg.from_name and target_msg.from_name.lower() != "user":
+            if target_msg:
                 target = target_msg.from_name
-                G.add_edge(author, target, weight=INTERACTION_WEIGHTS['reply'])
+                if (
+                    not target
+                    or target.lower() == "user"
+                    or target == "Unknown"
+                ):
+                    if target_msg.from_id:
+                        target = user_map.get(str(target_msg.from_id)) or username_map.get(
+                            str(target_msg.from_id)
+                        )
+                if target and target.lower() != "user":
+                    G.add_edge(author, target, weight=INTERACTION_WEIGHTS['reply'])
         if isinstance(m.text, str) and '@' in m.text:
             # naive mention detection
             for word in m.text.split():
@@ -82,6 +93,11 @@ def build_graph(
                         G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and median_delta > 0:
             prev_author = last_message.from_name
+            if not prev_author or prev_author.lower() == "user" or prev_author == "Unknown":
+                if last_message.from_id:
+                    prev_author = user_map.get(str(last_message.from_id)) or username_map.get(
+                        str(last_message.from_id)
+                    )
             if prev_author and prev_author.lower() != "user":
                 G.add_edge(
                     author,
