@@ -46,6 +46,12 @@ Follow these steps even if you have never written code before.
 
    You should see a message that the bot has started and is waiting for files.
 
+   If you prefer not to use the command line, simply double-click
+   `launch_bot.py` in the project folder. A small window will appear where you
+   can paste the bot token and press **"Запустить"**. The bot will start in the
+   background and the window will remain open so you can close it to stop the
+   bot.
+
 7. **Send a chat export**. Use Telegram’s built‑in export feature to save a chat
    history as a JSON file (usually named `result.json`). Send this file to your
    bot. After the upload finishes, the bot will analyze the chat and reply first
