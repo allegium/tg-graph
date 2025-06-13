@@ -334,7 +334,7 @@ def visualize_graph_html(
         "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 150 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
-        "    .force('charge', d3.forceManyBody().strength(-3000))",
+        "    .force('charge', d3.forceManyBody().strength(-7000))",
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
         "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.1))",
         "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.1))",
