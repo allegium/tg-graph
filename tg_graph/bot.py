@@ -7,7 +7,7 @@ from aiogram.utils import executor
 from .parser import load_chat, parse_messages, parse_users
 from .graph_builder import compute_median_delta, build_graph
 from .metrics import compute_metrics, compute_interaction_strengths
-from .visualization import visualize_graph
+from .visualization import visualize_graph, visualize_graph_html
 from .report import build_pdf
 
 TOKEN = os.getenv('TG_BOT_TOKEN')
@@ -49,14 +49,18 @@ async def process_document(message: types.Message, file_path: str, workdir: str)
     strengths = compute_interaction_strengths(G)
 
     graph_path = os.path.join(workdir, 'graph.png')
+    html_path = os.path.join(workdir, 'graph.html')
     pdf_path = os.path.join(workdir, 'report.pdf')
     visualize_graph(G, metrics, graph_path)
+    visualize_graph_html(G, html_path)
     build_pdf(graph_path, metrics, strengths, pdf_path)
     with open(graph_path, 'rb') as img:
         await message.reply_document(img, caption='Граф взаимодействий')
+    with open(html_path, 'rb') as doc:
+        await message.reply_document(doc, caption='Интерактивный граф (HTML)')
     with open(pdf_path, 'rb') as doc:
         await message.reply_document(doc, caption='Подробный отчёт')
-    for fname in (file_path, graph_path, pdf_path):
+    for fname in (file_path, graph_path, html_path, pdf_path):
         try:
             os.remove(fname)
         except FileNotFoundError:
