@@ -347,11 +347,13 @@ def visualize_graph_html(
         "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label)",
         "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
         "const simulation = d3.forceSimulation(nodes)",
-        "    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 150 / Math.max(d.weight, 0.1)).strength(d => Math.min(d.weight / 6, 1)))",
+        "    .force('link', d3.forceLink(links).id(d => d.id)"
+        "        .distance(d => 150 / Math.max(d.weight, 0.1))"
+        "        .strength(d => { const base = Math.min(d.weight / 6, 1); const cf = d.source.cluster === d.target.cluster ? 3 : 1/3; return base * cf * 0.1; }))",
         "    .force('charge', d3.forceManyBody().strength(-14000))",
         "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
-        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.6))",
-        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.6))",
+        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(1.8))",
+        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(1.8))",
         "    .force('center', d3.forceCenter(width / 2, height / 2));",
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
