@@ -66,8 +66,13 @@ def _edge_width(weight: float) -> float:
 
 
 def _edge_opacity(weight: float) -> float:
-    """Return line opacity for a given interaction strength."""
-    return 0.3 + 0.05 * weight
+    """Return line opacity for a given interaction strength.
+
+    The opacity is clamped to the ``[0, 1]`` range to avoid invalid RGBA
+    values that may cause ``matplotlib`` to fail when drawing edges with a
+    very high weight.
+    """
+    return max(0.0, min(0.3 + 0.05 * weight, 1.0))
 
 
 def _node_radius(degree: int) -> float:
