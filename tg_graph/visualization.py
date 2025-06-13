@@ -352,8 +352,8 @@ def visualize_graph_html(
         "        .distance(d => 150 / Math.max(d.weight, 0.1))"
         "        .strength(d => {",
         "            const base = Math.min(d.weight / 6, 1);",
-        "            const cf = d.source.cluster === d.target.cluster ? 3 : 1 / 3;",
-        "            // Reduce overall attraction and bias toward same clusters",
+        "            // Increase attraction within a cluster and reduce it across clusters",
+        "            const cf = d.source.cluster === d.target.cluster ? 60 : 1 / 60;",
         "            return base * cf * 0.0001;",
         "        }))",
         "    .force('charge', d3.forceManyBody().strength(-14000))",
