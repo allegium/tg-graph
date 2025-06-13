@@ -39,7 +39,9 @@ def _simple_pagerank(
 
     for _ in range(max_iter):
         prev_rank = rank.copy()
-        dangling_sum = alpha * sum(prev_rank[u] for u in nodes if out_weight[u] == 0.0) / n
+        dangling_sum = (
+            alpha * sum(prev_rank[u] for u in nodes if out_weight[u] == 0.0) / n
+        )
         for v in nodes:
             rank_v = (1.0 - alpha) / n + dangling_sum
             for u, _, data in G.in_edges(v, data=True):
@@ -58,32 +60,32 @@ def _simple_pagerank(
 
 def compute_metrics(G: nx.MultiDiGraph) -> Dict[str, float]:
     metrics = {
-        'nodes': G.number_of_nodes(),
-        'edges': G.number_of_edges(),
+        "nodes": G.number_of_nodes(),
+        "edges": G.number_of_edges(),
     }
     if G.number_of_nodes() == 0:
         return metrics
     degrees = dict(G.degree())
-    metrics['avg_degree'] = sum(degrees.values()) / len(degrees)
-    metrics['degree_centrality'] = nx.degree_centrality(G)
-    metrics['betweenness_centrality'] = nx.betweenness_centrality(G)
-    metrics['closeness_centrality'] = nx.closeness_centrality(G)
+    metrics["avg_degree"] = sum(degrees.values()) / len(degrees)
+    metrics["degree_centrality"] = nx.degree_centrality(G)
+    metrics["betweenness_centrality"] = nx.betweenness_centrality(G)
+    metrics["closeness_centrality"] = nx.closeness_centrality(G)
     try:
         # ``nx.pagerank`` uses SciPy when available. On systems where
         # SciPy is not installed this may fail, so we use a small
         # fallback implementation.
-        metrics['pagerank'] = nx.pagerank(G)
+        metrics["pagerank"] = nx.pagerank(G)
     except ModuleNotFoundError:
-        metrics['pagerank'] = _simple_pagerank(G)
+        metrics["pagerank"] = _simple_pagerank(G)
     try:
         clusters = nx.algorithms.community.louvain_communities(G)
-        metrics['clusters'] = len(clusters)
+        metrics["clusters"] = len(clusters)
     except Exception:
-        metrics['clusters'] = 0
+        metrics["clusters"] = 0
     try:
-        metrics['diameter'] = nx.diameter(G.to_undirected())
+        metrics["diameter"] = nx.diameter(G.to_undirected())
     except Exception:
-        metrics['diameter'] = 0
+        metrics["diameter"] = 0
     return metrics
 
 
@@ -94,3 +96,13 @@ def compute_interaction_strengths(G: nx.MultiDiGraph) -> Dict[tuple, float]:
         key = (u, v)
         strengths[key] = strengths.get(key, 0.0) + float(data.get("weight", 1.0))
     return strengths
+
+
+def compute_node_strengths(G: nx.MultiDiGraph) -> Dict[str, float]:
+    """Return the total strength of connections for every node."""
+    totals: Dict[str, float] = {}
+    for u, v, data in G.edges(data=True):
+        w = float(data.get("weight", 1.0))
+        totals[u] = totals.get(u, 0.0) + w
+        totals[v] = totals.get(v, 0.0) + w
+    return totals
