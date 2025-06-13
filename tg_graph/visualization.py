@@ -34,12 +34,14 @@ def visualize_graph(
     plt.figure(figsize=(12, 10), dpi=200)
 
     agg = nx.DiGraph()
-    agg.add_nodes_from(G.nodes())
+    valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
+    agg.add_nodes_from(valid_nodes)
     for (u, v), w in strengths.items():
-        agg.add_edge(u, v, weight=w)
+        if u in valid_nodes and v in valid_nodes:
+            agg.add_edge(u, v, weight=w)
 
     # Spread nodes further apart so that labels do not overlap
-    pos = nx.spring_layout(agg, k=2.0, seed=42, weight="weight")
+    pos = nx.spring_layout(agg, k=4.0, seed=42, weight="weight")
     # Move the most connected nodes closer to the center
     degrees = dict(agg.degree())
     if degrees:
@@ -64,13 +66,25 @@ def visualize_graph(
         linewidths=0.5,
     )
 
+    def _color(weight: float) -> str:
+        if weight <= 1:
+            return "#fff7ae"  # pastel yellow
+        if weight <= 3:
+            return "#b2ffb2"  # pastel green
+        if weight <= 5:
+            return "#b2e1ff"  # pastel blue
+        return "#d7b2ff"  # pastel purple
+
+    edge_colors = [_color(w) for w in weights]
+
     nx.draw_networkx_edges(
         agg,
         pos,
         width=[w * 2.0 for w in weights],
         alpha=0.7,
-        edge_color="gray",
+        edge_color=edge_colors,
         arrows=True,
+        arrowsize=4,
     )
 
     nx.draw_networkx_labels(
@@ -94,11 +108,13 @@ def visualize_graph_html(
     """Save an interactive graph visualisation as a standalone HTML file."""
 
     agg = nx.DiGraph()
-    agg.add_nodes_from(G.nodes())
+    valid_nodes = [n for n in G.nodes() if sanitize_text(str(n))]
+    agg.add_nodes_from(valid_nodes)
     for (u, v), w in strengths.items():
-        agg.add_edge(u, v, weight=w)
+        if u in valid_nodes and v in valid_nodes:
+            agg.add_edge(u, v, weight=w)
 
-    pos = nx.spring_layout(agg, k=2.0, seed=42, weight="weight")
+    pos = nx.spring_layout(agg, k=4.0, seed=42, weight="weight")
 
     coords = list(pos.values())
     min_dist = None
@@ -130,7 +146,7 @@ def visualize_graph_html(
         "<head>",
         "<meta charset='utf-8'>",
         "<style>",
-        "line {stroke: gray; stroke-width: 1.5; opacity: 0.7;}",
+        "line {stroke-width: 1.5; opacity: 0.7;}",
         "line:hover {stroke: red; stroke-width: 3;}",
         "circle {fill: #1f77b4; stroke: black; stroke-width: 1;}",
         "circle:hover {fill: orange;}",
@@ -140,24 +156,36 @@ def visualize_graph_html(
         "<body>",
         f"<svg width='{width}' height='{height}' xmlns='http://www.w3.org/2000/svg'>",
         "<defs>",
-        "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='6' markerHeight='6' orient='auto-start-reverse'>",
-        "<path d='M 0 0 L 10 5 L 0 10 z' fill='gray' />",
+        "<marker id='arrow' viewBox='0 0 10 10' refX='6' refY='5' markerWidth='3' markerHeight='3' orient='auto-start-reverse'>",
+        "<path d='M 0 0 L 10 5 L 0 10 z' fill='context-stroke' />",
         "</marker>",
         "</defs>",
     ]
+
+    def _color(weight: float) -> str:
+        if weight <= 1:
+            return "#fff7ae"  # pastel yellow
+        if weight <= 3:
+            return "#b2ffb2"  # pastel green
+        if weight <= 5:
+            return "#b2e1ff"  # pastel blue
+        return "#d7b2ff"  # pastel purple
 
     for (u, v), w in strengths.items():
         x1, y1 = shifted[u]
         x2, y2 = shifted[v]
         su = sanitize_text(str(u))
         sv = sanitize_text(str(v))
+        color = _color(w)
         parts.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke-width:{w * 2.0:.2f}'>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' marker-end='url(#arrow)' style='stroke:{color}; stroke-width:{w * 2.0:.2f}'>"
             f"<title>{su} \u2192 {sv} | \u0421\u0438\u043b\u0430: {w:.2f}</title></line>"
         )
 
     for node, (x, y) in shifted.items():
         label = sanitize_text(str(node))
+        if not label:
+            continue
         parts.append(f"<circle cx='{x:.2f}' cy='{y:.2f}' r='8'><title>{label}</title></circle>")
         parts.append(f"<text x='{x + 10:.2f}' y='{y - 10:.2f}'>{label}</text>")
 
