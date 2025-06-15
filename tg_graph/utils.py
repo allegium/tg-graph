@@ -15,6 +15,12 @@ def sanitize_text(text: str) -> str:
         # typically present in the default Matplotlib font and cause warnings
         if cat.startswith("S"):
             continue
+        name = unicodedata.name(ch, "")
+        if any(
+            key in name
+            for key in ("CJK", "HIRAGANA", "KATAKANA", "HANGUL", "MONGOLIAN")
+        ):
+            continue
         # Escape the dollar sign to prevent Matplotlib from interpreting it as
         # a math text delimiter
         if ch == "$":

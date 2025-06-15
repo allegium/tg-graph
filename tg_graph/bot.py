@@ -28,9 +28,29 @@ async def start(message: types.Message):
 
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
+    max_size = 20 * 1024 * 1024  # Telegram Bot API limit for getFile
+    if message.document.file_size and message.document.file_size > max_size:
+        await message.reply(
+            'К сожалению, файл больше 20 МБ, и бот не может его скачать. '
+            'Попробуйте уменьшить размер экспорта (например, исключив медиафайлы).'
+        )
+        return
+
     await message.reply('Файл получен, начинаю обработку...')
     workdir = tempfile.mkdtemp(prefix='tgdocs_')
-    file = await message.document.download(destination_dir=workdir)
+    try:
+        file = await message.document.download(destination_dir=workdir)
+    except Exception as e:  # e.g. FileIsTooBig
+        await message.reply(
+            'Не удалось скачать файл: {}. Убедитесь, что его размер не превышает 20 МБ.'
+            .format(getattr(e, 'message', str(e)))
+        )
+        try:
+            os.rmdir(workdir)
+        except OSError:
+            pass
+        return
+
     file_path = os.path.join(workdir, file.name)
     asyncio.create_task(process_document(message, file_path, workdir))
 
