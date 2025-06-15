@@ -28,10 +28,10 @@ async def start(message: types.Message):
 
 @dp.message_handler(content_types=types.ContentType.DOCUMENT)
 async def handle_document(message: types.Message):
-    max_size = 100 * 1024 * 1024  # Allow files up to 100 MB
+    max_size = 20 * 1024 * 1024  # Telegram Bot API limit for getFile
     if message.document.file_size and message.document.file_size > max_size:
         await message.reply(
-            'К сожалению, файл больше 100 МБ, и бот не может его скачать. '
+            'К сожалению, файл больше 20 МБ, и бот не может его скачать. '
             'Попробуйте уменьшить размер экспорта (например, исключив медиафайлы).'
         )
         return
@@ -42,7 +42,7 @@ async def handle_document(message: types.Message):
         file = await message.document.download(destination_dir=workdir)
     except Exception as e:  # e.g. FileIsTooBig
         await message.reply(
-            'Не удалось скачать файл: {}. Убедитесь, что его размер не превышает 100 МБ.'
+            'Не удалось скачать файл: {}. Убедитесь, что его размер не превышает 20 МБ.'
             .format(getattr(e, 'message', str(e)))
         )
         try:
