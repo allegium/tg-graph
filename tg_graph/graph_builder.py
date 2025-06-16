@@ -1,5 +1,6 @@
 import networkx as nx
-from typing import Dict, List
+from typing import Dict, List, Optional
+from datetime import datetime
 from .parser import Message
 
 INTERACTION_WEIGHTS = {
@@ -10,23 +11,46 @@ INTERACTION_WEIGHTS = {
     'temporal': 0.2,
 }
 
+def _parse_date(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def compute_median_delta(messages: List[Message]) -> float:
+    """Return the median time gap between consecutive messages in seconds."""
+
     deltas = []
     msg_map = {m.id: m for m in messages}
-    prev_date = None
+    prev_dt: Optional[datetime] = None
     for m in messages:
+        cur_dt = _parse_date(m.date)
+        if not cur_dt:
+            prev_dt = cur_dt
+            continue
         if m.reply_to and m.reply_to in msg_map:
-            # difference from replied message
-            # placeholder: for now use 0 since we do not parse datetime
-            deltas.append(0)
-        elif prev_date:
-            deltas.append(0)
-        prev_date = m.date
+            replied_dt = _parse_date(msg_map[m.reply_to].date)
+            if replied_dt:
+                delta = (cur_dt - replied_dt).total_seconds()
+                if delta >= 0:
+                    deltas.append(delta)
+        elif prev_dt:
+            delta = (cur_dt - prev_dt).total_seconds()
+            if delta >= 0:
+                deltas.append(delta)
+        prev_dt = cur_dt
+
     if not deltas:
-        return 0
+        return 0.0
+
     deltas.sort()
     mid = len(deltas) // 2
-    return float(deltas[mid])
+    if len(deltas) % 2:
+        return float(deltas[mid])
+    return float((deltas[mid - 1] + deltas[mid]) / 2)
 
 def build_graph(
     messages: List[Message],
@@ -92,18 +116,23 @@ def build_graph(
                     if actor_name.lower() != "user" and actor_name != "Unknown" and actor_name != author:
                         G.add_edge(actor_name, author, weight=INTERACTION_WEIGHTS['reaction'])
         if last_message and median_delta > 0:
-            prev_author = last_message.from_name
-            if not prev_author or prev_author.lower() == "user" or prev_author == "Unknown":
-                if last_message.from_id:
-                    prev_author = user_map.get(str(last_message.from_id)) or username_map.get(
-                        str(last_message.from_id)
-                    )
-            if prev_author and prev_author.lower() != "user" and prev_author != author:
-                G.add_edge(
-                    author,
-                    prev_author,
-                    weight=INTERACTION_WEIGHTS['temporal'],
-                )
+            cur_dt = _parse_date(m.date)
+            prev_dt = _parse_date(last_message.date)
+            if cur_dt and prev_dt:
+                delta = (cur_dt - prev_dt).total_seconds()
+                if 0 <= delta <= median_delta:
+                    prev_author = last_message.from_name
+                    if not prev_author or prev_author.lower() == "user" or prev_author == "Unknown":
+                        if last_message.from_id:
+                            prev_author = user_map.get(str(last_message.from_id)) or username_map.get(
+                                str(last_message.from_id)
+                            )
+                    if prev_author and prev_author.lower() != "user" and prev_author != author:
+                        G.add_edge(
+                            author,
+                            prev_author,
+                            weight=INTERACTION_WEIGHTS['temporal'],
+                        )
         last_message = m
     # Remove isolated or unnamed nodes
     to_remove = [
