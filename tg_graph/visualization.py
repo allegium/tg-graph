@@ -81,11 +81,11 @@ def _edge_opacity(weight: float) -> float:
 def _node_radius(degree: int) -> float:
     """Return node radius based on the total number of connections.
 
-    The radius grows gradually with increasing degree but is capped at 70 so
+    The radius grows gradually with increasing degree but is capped at 40 so
     that very active participants do not create disproportionately large
     circles in the visualisation.
     """
-    return min(70.0, 6.0 + degree * 1.1)
+    return min(40.0, 6.0 + degree * 1.01)
 
 
 def _cluster_color(index: int) -> str:
