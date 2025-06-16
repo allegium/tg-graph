@@ -81,11 +81,11 @@ def _edge_opacity(weight: float) -> float:
 def _node_radius(degree: int) -> float:
     """Return node radius based on the total number of connections.
 
-    The radius grows gradually with increasing degree but is capped at 30 so
+    The radius grows gradually with increasing degree but is capped at 70 so
     that very active participants do not create disproportionately large
     circles in the visualisation.
     """
-    return min(30.0, 6.0 + degree * 1.1)
+    return min(70.0, 6.0 + degree * 1.1)
 
 
 def _cluster_color(index: int) -> str:
@@ -238,7 +238,7 @@ def visualize_graph_html(
     degrees = dict(agg.degree())
     node_radii = {n: _node_radius(deg) for n, deg in degrees.items()}
 
-    _, clusters = _cluster_layout(agg, weight="weight")
+    layout_pos, clusters = _cluster_layout(agg, weight="weight")
     node_colors = {n: _cluster_color(clusters.get(n, 0)) for n in agg.nodes()}
 
     node_strengths: Dict[str, float] = {}
@@ -248,11 +248,7 @@ def visualize_graph_html(
         if v in valid_nodes:
             node_strengths[v] = node_strengths.get(v, 0.0) + w
 
-    # ``width`` and ``height`` are kept for backwards compatibility but
-    # the actual SVG dimensions will be set dynamically in the generated
-    # HTML so the graph takes up the full browser window.
-    width = 960
-    height = 720
+
 
     nodes = [
         {
@@ -262,6 +258,8 @@ def visualize_graph_html(
             "color": node_colors.get(n, "#1f77b4"),
             "strength": node_strengths.get(n, 0.0),
             "cluster": clusters.get(n, 0),
+            "x": float(layout_pos.get(n, (0.0, 0.0))[0]),
+            "y": float(layout_pos.get(n, (0.0, 0.0))[1]),
         }
         for n in agg.nodes()
         if sanitize_text(str(n)) and degrees.get(n, 0) > 0
@@ -343,29 +341,34 @@ def visualize_graph_html(
         "const node = g.selectAll('circle').data(nodes).enter().append('circle')",
         "    .attr('r', d => d.radius)",
         "    .attr('fill', d => d.color)",
+        "    .attr('cx', d => d.x)",
+        "    .attr('cy', d => d.y)",
         "    .call(d3.drag().on('start', dragStarted).on('drag', dragged).on('end', dragEnded));",
         "node.append('title').text(d => d.label + ' | \u0421\u0438\u043b\u0430: ' + d.strength.toFixed(2));",
         "const label = g.selectAll('text').data(nodes).enter().append('text').text(d => d.label)",
-        "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle');",
+        "    .attr('text-anchor', 'middle').attr('alignment-baseline', 'middle')",
+        "    .attr('x', d => d.x).attr('y', d => d.y);",
         "const simulation = d3.forceSimulation(nodes)",
         "    .force('link', d3.forceLink(links).id(d => d.id)"
         "        .distance(d => 150 / Math.max(d.weight, 0.1))"
         "        .strength(d => {",
         "            const base = Math.min(d.weight / 6, 1);",
-        "            // Increase attraction within a cluster and reduce it across clusters",
-        "            const cf = d.source.cluster === d.target.cluster ? 3000 : 1 / 1;",
-        "            return base * cf * 0.0001;",
+        "            const cf = d.source.cluster === d.target.cluster ? 0.05 : 0.01;",
+        "            return base * cf;",
         "        }))",
-        "    .force('charge', d3.forceManyBody().strength(-14000))",
-        "    .force('collide', d3.forceCollide().radius(d => d.radius + 8))",
-        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(1.8))",
-        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(1.8))",
-        "    .force('center', d3.forceCenter(width / 2, height / 2));",
+        "    .force('charge', d3.forceManyBody().strength(-300))",
+        "    .force('collide', d3.forceCollide().radius(d => d.radius + 4))",
+        "    .force('clusterX', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.6))",
+        "    .force('clusterY', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.6))",
+        "    .force('center', d3.forceCenter(width / 2, height / 2))",
+        "    .alphaDecay(0.06)",
+        "    .velocityDecay(0.4);",
         "simulation.on('tick', () => {",
         "    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);",
         "    node.attr('cx', d => d.x).attr('cy', d => d.y);",
         "    label.attr('x', d => d.x).attr('y', d => d.y);",
         "});",
+        "d3.timeout(() => simulation.stop(), 3000);",
         "function dragStarted(event, d){ if(!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }",
         "function dragged(event, d){ d.fx = event.x; d.fy = event.y; }",
         "function dragEnded(event, d){ if(!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }",
